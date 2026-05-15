@@ -96,8 +96,8 @@ Gate closes
 | parking/rpi1/distance | sensor distances |
 | parking/rpi1/risk | SAFE/WARNING/DANGER |
 | parking/rpi1/event | parking events |
-| parking/rpi2/gate/status | gate state |
-| parking/rpi2/event | gate events |
+| parking/rpi2/gate | gate state |
+| parking/rpi2/event | gate and exit request events |
 
 ---
 
@@ -142,4 +142,6 @@ SQLite is used to store:
 2. Rpi #3 receives MQTT message
 3. Sensor/event data stored in SQLite
 4. Dashboard updates in real time
-5. User monitors parking state through web UI
+5. Rpi #2 publishes gate state and exit events
+6. Rpi #3 stores gate/exit events
+7. User monitors parking state through web UI
