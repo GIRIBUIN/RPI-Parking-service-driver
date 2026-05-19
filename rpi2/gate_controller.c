@@ -12,8 +12,6 @@
 
 static GateState current_state = GATE_OPEN;
 static pthread_mutex_t gate_mutex = PTHREAD_MUTEX_INITIALIZER;
-static int pwm_fd = -1;
-static int led_fd = -1;
 
 // GPIO export/unexport
 static int export_gpio(int pin) {
@@ -56,20 +54,7 @@ static int set_gpio_direction(int pin, const char *dir) {
   return 0;
 }
 
-// GPIO 값 읽기/쓰기
-static int get_gpio_value(int pin) {
-  char path[256];
-  char val[2];
-  snprintf(path, sizeof(path), "%s/gpio%d/value", GPIO_PATH, pin);
-  int fd = open(path, O_RDONLY);
-  if (fd < 0) {
-    return -1;
-  }
-  read(fd, val, 1);
-  close(fd);
-  return val[0] - '0';
-}
-
+// GPIO 값 쓰기
 static int set_gpio_value(int pin, int value) {
   char path[256];
   snprintf(path, sizeof(path), "%s/gpio%d/value", GPIO_PATH, pin);
