@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <time.h>
+#include "config.h"
 #include "gate_controller.h"
 #include "switch_handler.h"
 #include "mqtt_client.h"

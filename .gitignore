@@ -23,3 +23,6 @@ captures/*
 .vscode/
 .idea/
 *.swp
+
+# claude
+.claude/
