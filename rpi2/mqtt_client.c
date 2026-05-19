@@ -3,71 +3,86 @@
 #include <stdlib.h>
 #include <time.h>
 #include <pthread.h>
-#include "MQTTClient.h"
+#include <mosquitto.h>
 #include "config.h"
 #include "mqtt_client.h"
 
 #define MAX_PAYLOAD 256
-#define CONNECTION_TIMEOUT 10000  // ms
-#define RECONNECT_INTERVAL 5      // sec
 
-static MQTTClient client;
+static struct mosquitto *mosq = NULL;
 static MqttCommandCallback mqtt_cmd_callback = NULL;
 static int is_mqtt_connected = 0;
 static pthread_mutex_t mqtt_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-static void message_arrived(void *context, char *topic, int topicLen,
-                           MQTTClient_message *message) {
-  char payload[MAX_PAYLOAD] = {0};
-  strncpy(payload, (char *)message->payload, message->payloadlen);
+static void on_connect(struct mosquitto *mosq, void *obj, int result) {
+  if (result == 0) {
+    printf("MQTT 연결 성공\n");
+    pthread_mutex_lock(&mqtt_mutex);
+    is_mqtt_connected = 1;
+    pthread_mutex_unlock(&mqtt_mutex);
 
-  if (strcmp(topic, TOPIC_SUB_GATE_CMD) == 0) {
-    if (mqtt_cmd_callback) {
-      mqtt_cmd_callback(payload);
-    }
+    mosquitto_subscribe(mosq, NULL, TOPIC_SUB_GATE_CMD, 1);
+    printf("구독: %s\n", TOPIC_SUB_GATE_CMD);
+  } else {
+    printf("MQTT 연결 실패 (코드: %d)\n", result);
+    pthread_mutex_lock(&mqtt_mutex);
+    is_mqtt_connected = 0;
+    pthread_mutex_unlock(&mqtt_mutex);
   }
-
-  MQTTClient_freeMessage(&message);
 }
 
-static void connection_lost(void *context, char *cause) {
-  printf("MQTT 연결 끊김: %s\n", cause);
+static void on_disconnect(struct mosquitto *mosq, void *obj, int result) {
+  printf("MQTT 연결 끊김\n");
   pthread_mutex_lock(&mqtt_mutex);
   is_mqtt_connected = 0;
   pthread_mutex_unlock(&mqtt_mutex);
 }
 
+static void on_message(struct mosquitto *mosq, void *obj,
+                       const struct mosquitto_message *msg) {
+  char payload[MAX_PAYLOAD] = {0};
+
+  if (msg->payloadlen > 0) {
+    strncpy(payload, (char *)msg->payload,
+            msg->payloadlen < MAX_PAYLOAD - 1 ? msg->payloadlen : MAX_PAYLOAD - 1);
+  }
+
+  if (strcmp(msg->topic, TOPIC_SUB_GATE_CMD) == 0) {
+    if (mqtt_cmd_callback) {
+      mqtt_cmd_callback(payload);
+    }
+  }
+}
+
 void mqtt_client_init(MqttCommandCallback on_gate_cmd) {
   mqtt_cmd_callback = on_gate_cmd;
 
-  char address[256];
-  snprintf(address, sizeof(address), "tcp://%s:%d", MQTT_HOST, MQTT_PORT);
+  mosquitto_lib_init();
 
-  MQTTClient_create(&client, address, MQTT_CLIENT_ID,
-                   MQTTCLIENT_PERSISTENCE_NONE, NULL);
+  mosq = mosquitto_new(MQTT_CLIENT_ID, true, NULL);
+  if (!mosq) {
+    printf("MQTT 클라이언트 생성 실패\n");
+    return;
+  }
 
-  MQTTClient_setCallbacks(client, NULL, connection_lost, message_arrived, NULL);
+  mosquitto_connect_callback_set(mosq, on_connect);
+  mosquitto_disconnect_callback_set(mosq, on_disconnect);
+  mosquitto_message_callback_set(mosq, on_message);
 }
 
 void mqtt_connect(void) {
-  MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
-  conn_opts.keepAliveInterval = MQTT_KEEPALIVE;
-  conn_opts.cleansession = 1;
+  if (!mosq) {
+    printf("MQTT 클라이언트 초기화 필요\n");
+    return;
+  }
 
-  int rc = MQTTClient_connect(client, &conn_opts);
+  int rc = mosquitto_connect(mosq, MQTT_HOST, MQTT_PORT, MQTT_KEEPALIVE);
 
-  if (rc == MQTTCLIENT_SUCCESS) {
-    pthread_mutex_lock(&mqtt_mutex);
-    is_mqtt_connected = 1;
-    pthread_mutex_unlock(&mqtt_mutex);
-
-    MQTTClient_subscribe(client, TOPIC_SUB_GATE_CMD, 1);
-    printf("MQTT 연결 성공, 구독: %s\n", TOPIC_SUB_GATE_CMD);
+  if (rc == MOSQ_ERR_SUCCESS) {
+    mosquitto_loop_start(mosq);
+    printf("MQTT 연결 시도\n");
   } else {
-    printf("MQTT 연결 실패 (코드: %d)\n", rc);
-    pthread_mutex_lock(&mqtt_mutex);
-    is_mqtt_connected = 0;
-    pthread_mutex_unlock(&mqtt_mutex);
+    printf("MQTT 연결 실패: %s\n", mosquitto_strerror(rc));
   }
 }
 
@@ -76,8 +91,8 @@ void mqtt_publish_gate_state(const char *state) {
     return;
   }
 
-  MQTTClient_publish(client, TOPIC_PUB_GATE_STATE, strlen(state),
-                    (void *)state, 1, 1, NULL);
+  mosquitto_publish(mosq, NULL, TOPIC_PUB_GATE_STATE,
+                   strlen(state), (void *)state, 1, true);
 }
 
 void mqtt_publish_event(const char *event) {
@@ -92,8 +107,8 @@ void mqtt_publish_event(const char *event) {
           "{\"event\": \"%s\", \"timestamp\": %ld}",
           event, (long)now);
 
-  MQTTClient_publish(client, TOPIC_PUB_EVENT, strlen(payload),
-                    (void *)payload, 1, 0, NULL);
+  mosquitto_publish(mosq, NULL, TOPIC_PUB_EVENT,
+                   strlen(payload), (void *)payload, 1, false);
 }
 
 int mqtt_is_connected(void) {
@@ -104,8 +119,11 @@ int mqtt_is_connected(void) {
 }
 
 void mqtt_client_cleanup(void) {
-  if (mqtt_is_connected()) {
-    MQTTClient_disconnect(client, 10000);
+  if (mosq) {
+    mosquitto_loop_stop(mosq, true);
+    mosquitto_disconnect(mosq);
+    mosquitto_destroy(mosq);
+    mosquitto_lib_cleanup();
+    mosq = NULL;
   }
-  MQTTClient_destroy(&client);
 }
