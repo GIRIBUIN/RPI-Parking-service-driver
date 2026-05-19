@@ -7,13 +7,25 @@
 기획서에 명시된 3대의 라즈베리파이(Raspberry Pi)를 효율적으로 연결하고 제어하기 위해 다음과 같은 스택을 확정합니다.
 
 * **하드웨어 및 OS**: Raspberry Pi 3대 (Raspberry Pi OS)
-* **디바이스 제어 (Rpi #1, #2)**: C (`wiringPi` 또는 `pigpio` 라이브러리 사용)
+* **디바이스 제어 (Rpi #1, #2)**: C (표준 라이브러리만 사용, `/sys/class/gpio/` 인터페이스로 GPIO 직접 제어, PWM은 `/sys/class/pwm/` 인터페이스 사용)
 * **통신 프로토콜**: MQTT (실시간 비동기 통신에 최적화)
     * **Broker**: Eclipse Mosquitto (Rpi #3에 설치)
     * **Client**: C `libpaho-mqtt3c` 라이브러리
 * **백엔드 및 DB (Rpi #3)**: Python FastAPI (가볍고 빠른 API 서버) + SQLite
 * **프론트엔드 (Digital Twin Dashboard)**: React.js + Tailwind CSS + 2D Canvas (HTML5)
     * `mqtt.js`를 사용하여 브라우저에서 직접 MQTT 토픽을 구독해 지연 없는 실시간 렌더링 구현.
+
+---
+
+### 1.1 중요: wiringPi 라이브러리 사용 금지
+
+**wiringPi는 사용하지 않습니다.** 이유:
+- 외부 라이브러리 의존성 최소화
+- 커널 표준 인터페이스(`/sys/class/gpio/`, `/sys/class/pwm/`) 직접 사용
+- 크로스 플랫폼 호환성 향상
+- 유지보수성 및 독립성 강화
+
+GPIO는 `/sys/class/gpio/` 인터페이스로, PWM은 `/sys/class/pwm/` 인터페이스로 직접 제어합니다.
 
 ---
 

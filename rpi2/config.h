@@ -6,12 +6,14 @@
 #define LED_PIN         24
 #define SWITCH_PIN      23
 
-// 서보 PWM (wiringPi)
-#define PWM_CLOCK       192
-#define PWM_RANGE       2000
-#define PWM_DUTY_OPEN   50    // 0.5ms (0도)
-#define PWM_DUTY_CLOSED 240   // 2.4ms (~180도)
-#define SERVO_DELAY_MS  500
+// 서보 PWM (나노초 단위)
+// 50Hz = 20ms = 20000000ns 주기
+// OPEN (0도):   0.5ms = 500000ns
+// CLOSED(180도): 2.4ms = 2400000ns
+#define PWM_PERIOD_NS        20000000
+#define PWM_DUTY_OPEN_NS     500000
+#define PWM_DUTY_CLOSED_NS   2400000
+#define SERVO_DELAY_MS       500
 
 // MQTT
 #define MQTT_HOST       "192.168.1.100"

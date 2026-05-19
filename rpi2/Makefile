@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -pthread
-LIBS = -lwiringPi -lpaho-mqtt3c
+LIBS = -lpaho-mqtt3c
 
 TARGET = gate_node
 SRCS = main.c gate_controller.c switch_handler.c mqtt_client.c

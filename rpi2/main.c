@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <signal.h>
 #include <time.h>
@@ -66,7 +67,7 @@ int main(void) {
 
   // Switch 인터럽트 설정
   switch_handler_init(on_switch_press);
-  printf("Switch 인터럽트 설정 완료\n");
+  printf("Switch 모니터링 시작\n");
 
   // MQTT 클라이언트 초기화 및 연결
   mqtt_client_init(on_gate_command);
