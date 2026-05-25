@@ -1,87 +1,36 @@
-# Rpi #3 - Central Server & Digital Twin Node
+# RPI3 - Central Server & Digital Twin Dashboard
 
-Rpi #3 is responsible for:
-- MQTT broker
-- Database management
-- Dashboard monitoring
+RPI3 is responsible for:
+- MQTT Broker
+- MQTT message subscription
+- Sensor/event logging
+- SQLite database management
+- Real-time dashboard monitoring
 - 2D Digital Twin visualization
-- System state synchronization
 
 ---
 
 # Main Features
 
-- Receive parking state from Rpi #1
-- Receive gate state from Rpi #2
-- Store sensor/event logs
-- Update Digital Twin dashboard in real time
-- Provide web monitoring UI
+- Receive MQTT messages from RPI1 and RPI2
+- Store parking/gate/event logs
+- Provide real-time parking dashboard
+- Synchronize physical parking state with digital twin
 
 ---
 
-# Components
+# System Role
 
-| Component | Role |
-|---|---|
-| MQTT Broker | Communication between Raspberry Pis |
-| SQLite DB | Sensor/event log storage |
-| Web Dashboard | Real-time monitoring |
-| Digital Twin | Virtual parking space visualization |
+RPI3 acts as the central server of the system.
 
----
-
-# Dashboard Features
-
-## Parking State Monitoring
-
-Display:
-- EMPTY
-- APPROACHING
-- PARKING
-- PARKED
-
----
-
-## Warning State Monitoring
-
-Display:
-- SAFE
-- WARNING
-- DANGER
-
-Dashboard changes:
-- Color updates
-- Status text updates
-- Real-time sensor value display
-
----
-
-## Gate Monitoring
-
-Display:
-- OPEN
-- CLOSED
-
----
-
-# Digital Twin
-
-The Digital Twin dashboard synchronizes:
-- Real parking state
-- Vehicle movement
-- Gate status
-- Warning state
-
-Example:
 ```text
-Vehicle approaches
-→ Dashboard vehicle object moves
+RPI1 (Sensor Node)
+        ↓ MQTT
 
-Danger state detected
-→ Dashboard changes to warning color
+RPI3 (Broker + Dashboard + DB)
 
-Gate closes
-→ Dashboard gate state updates
+        ↑ MQTT
+RPI2 (Gate Node)
 ```
 
 ---
@@ -93,55 +42,120 @@ Gate closes
 | Topic | Description |
 |---|---|
 | parking/rpi1/status | parking state |
-| parking/rpi1/distance | sensor distances |
+| parking/rpi1/distance | ultrasonic distances |
 | parking/rpi1/risk | SAFE/WARNING/DANGER |
-| parking/rpi1/event | parking events |
 | parking/rpi2/gate | gate state |
-| parking/rpi2/event | gate and exit request events |
+| parking/rpi2/event | exit request event |
 
 ---
 
-# Database
+# Dashboard Features
 
-SQLite is used to store:
-- Parking events
-- Distance logs
-- Warning states
-- Gate states
-- Exit events
+- Parking state monitoring
+- Gate state monitoring
+- Distance visualization
+- Risk state monitoring
+- Real-time updates
 
 ---
 
-# Example Database Tables
+# Parking State
 
-## parking_log
-
-| Column | Description |
+| State | Description |
 |---|---|
-| timestamp | event time |
-| parking_state | current parking state |
-| risk_state | SAFE/WARNING/DANGER |
-| front_distance | front ultrasonic value |
-| rear_distance | rear ultrasonic value |
-| side_distance | side ultrasonic value |
+| EMPTY | no vehicle |
+| APPROACHING | vehicle approaching |
+| PARKING | vehicle entering |
+| PARKED | parking completed |
+| EXITING | vehicle exiting |
 
 ---
 
-## gate_log
+# Risk State
 
-| Column | Description |
+| State | Description |
 |---|---|
-| timestamp | event time |
-| gate_state | OPEN/CLOSED |
+| SAFE | safe distance |
+| WARNING | near threshold |
+| DANGER | collision risk |
 
 ---
 
-# Example Flow
+# Repository Structure
 
-1. Rpi #1 publishes parking status
-2. Rpi #3 receives MQTT message
-3. Sensor/event data stored in SQLite
-4. Dashboard updates in real time
-5. Rpi #2 publishes gate state and exit events
-6. Rpi #3 stores gate/exit events
-7. User monitors parking state through web UI
+```text
+rpi3/
+├── README.md
+├── requirements.txt
+├── app.py
+├── mqtt_handler.py
+├── state_manager.py
+├── db.py
+├── schema.sql
+├── templates/
+│   └── index.html
+└── static/
+    ├── style.css
+    └── dashboard.js
+```
+
+---
+
+# Technologies
+
+- Python
+- Flask
+- MQTT (Mosquitto)
+- SQLite
+- HTML/CSS/JavaScript
+
+---
+
+# Install
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+# Run MQTT Broker
+
+```bash
+mosquitto
+```
+
+---
+
+# Run Dashboard Server
+
+```bash
+python app.py
+```
+
+---
+
+# Run MQTT Subscriber
+
+```bash
+python mqtt_handler.py
+```
+
+---
+
+# Example MQTT Test
+
+```bash
+mosquitto_pub -h localhost \
+-t parking/rpi1/status \
+-m "PARKING"
+```
+
+---
+
+# Future Work
+
+- Multi parking slot support
+- Camera integration
+- Mobile dashboard
+- 3D Digital Twin
