@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RPI3 Parking Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <main class="dashboard">
+        <section class="status-strip">
+            <div>
+                <span class="label">Parking</span>
+                <strong id="parking-state">UNKNOWN</strong>
+            </div>
+            <div>
+                <span class="label">Risk</span>
+                <strong id="risk-state">UNKNOWN</strong>
+            </div>
+            <div>
+                <span class="label">Gate</span>
+                <strong id="gate-state">UNKNOWN</strong>
+            </div>
+        </section>
+
+        <section class="content">
+            <div class="parking-area">
+                <div class="parking-slot">
+                    <div id="vehicle" class="vehicle"></div>
+                    <div id="gate" class="gate"></div>
+                    <span class="sensor sensor-front">Front</span>
+                    <span class="sensor sensor-rear">Rear</span>
+                    <span class="sensor sensor-side">Side</span>
+                </div>
+            </div>
+
+            <aside class="panel">
+                <h1>Digital Twin Monitor</h1>
+                <dl class="metrics">
+                    <div><dt>Front</dt><dd id="front-distance">-</dd></div>
+                    <div><dt>Rear</dt><dd id="rear-distance">-</dd></div>
+                    <div><dt>Side</dt><dd id="side-distance">-</dd></div>
+                    <div><dt>Updated</dt><dd id="last-updated">-</dd></div>
+                </dl>
+                <h2>Events</h2>
+                <ul id="events" class="events"></ul>
+            </aside>
+        </section>
+    </main>
+    <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+</body>
+</html>
