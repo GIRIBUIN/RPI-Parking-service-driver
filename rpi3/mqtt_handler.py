@@ -3,7 +3,13 @@ import os
 
 import paho.mqtt.client as mqtt
 
-from db import init_db, insert_event_log, insert_gate_log, insert_parking_log
+from db import (
+    init_db,
+    insert_event_log,
+    insert_gate_log,
+    insert_lot_log,
+    insert_slot_log,
+)
 
 
 MQTT_HOST = os.environ.get("MQTT_HOST", "localhost")
@@ -11,38 +17,89 @@ MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 MQTT_TOPIC = "parking/#"
 
 
-def handle_message(topic, payload):
-    if topic == "parking/rpi1/status":
-        insert_parking_log(parking_state=payload)
+def handle_slot_message(topic, payload):
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError:
+        insert_event_log(
+            topic=topic,
+            event_type="invalid_slot_payload",
+            reason="json_decode_error",
+            payload=payload,
+        )
         return
 
-    if topic == "parking/rpi1/risk":
-        insert_parking_log(risk_state=payload)
+    insert_slot_log(
+        slot1_state=data.get("slot1"),
+        slot2_state=data.get("slot2"),
+    )
+
+
+def handle_distance_message(topic, payload):
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError:
+        insert_event_log(
+            topic=topic,
+            event_type="invalid_distance_payload",
+            reason="json_decode_error",
+            payload=payload,
+        )
+        return
+
+    insert_slot_log(
+        slot1_distance=data.get("slot1"),
+        slot2_distance=data.get("slot2"),
+    )
+
+
+def handle_event_message(topic, payload):
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError:
+        insert_event_log(
+            topic=topic,
+            event_type="invalid_event_payload",
+            reason="json_decode_error",
+            payload=payload,
+        )
+        return
+
+    insert_event_log(
+        topic=topic,
+        event_type=data.get("event"),
+        reason=data.get("reason"),
+        payload=payload,
+    )
+
+
+def handle_message(topic, payload):
+    if topic == "parking/rpi1/slot":
+        handle_slot_message(topic, payload)
         return
 
     if topic == "parking/rpi1/distance":
-        try:
-            distances = json.loads(payload)
-        except json.JSONDecodeError:
-            insert_event_log(topic, "invalid_distance_payload", payload)
-            return
+        handle_distance_message(topic, payload)
+        return
 
-        insert_parking_log(
-            front_distance=distances.get("front"),
-            rear_distance=distances.get("rear"),
-            side_distance=distances.get("side"),
-        )
+    if topic == "parking/rpi1/lot":
+        insert_lot_log(payload)
         return
 
     if topic == "parking/rpi2/gate":
         insert_gate_log(payload)
         return
 
-    if topic in ("parking/rpi1/event", "parking/rpi2/event"):
-        insert_event_log(topic, payload, payload)
+    if topic == "parking/rpi2/event":
+        handle_event_message(topic, payload)
         return
 
-    insert_event_log(topic, "unknown_topic", payload)
+    insert_event_log(
+        topic=topic,
+        event_type="unknown_topic",
+        reason="unsupported_topic",
+        payload=payload,
+    )
 
 
 def on_connect(client, userdata, flags, rc):

@@ -10,12 +10,16 @@
     <main class="dashboard">
         <section class="status-strip">
             <div>
-                <span class="label">Parking</span>
-                <strong id="parking-state">UNKNOWN</strong>
+                <span class="label">Slot 1</span>
+                <strong id="slot1-state">UNKNOWN</strong>
             </div>
             <div>
-                <span class="label">Risk</span>
-                <strong id="risk-state">UNKNOWN</strong>
+                <span class="label">Slot 2</span>
+                <strong id="slot2-state">UNKNOWN</strong>
+            </div>
+            <div>
+                <span class="label">Parking Lot</span>
+                <strong id="lot-state">UNKNOWN</strong>
             </div>
             <div>
                 <span class="label">Gate</span>
@@ -25,28 +29,48 @@
 
         <section class="content">
             <div class="parking-area">
-                <div class="parking-slot">
-                    <div id="vehicle" class="vehicle"></div>
-                    <div id="gate" class="gate"></div>
-                    <span class="sensor sensor-front">Front</span>
-                    <span class="sensor sensor-rear">Rear</span>
-                    <span class="sensor sensor-side">Side</span>
+                <div class="entrance">
+                    <span class="entrance-label">Entrance Gate</span>
+                    <div id="gate" class="gate closed"></div>
+                </div>
+
+                <div class="slot-area">
+                    <div id="slot1" class="slot unknown">
+                        <span class="slot-title">Slot 1</span>
+                        <span id="slot1-distance" class="slot-distance">-</span>
+                    </div>
+
+                    <div id="slot2" class="slot unknown">
+                        <span class="slot-title">Slot 2</span>
+                        <span id="slot2-distance" class="slot-distance">-</span>
+                    </div>
                 </div>
             </div>
 
             <aside class="panel">
-                <h1>Digital Twin Monitor</h1>
+                <h1>Parking Monitor</h1>
+
                 <dl class="metrics">
-                    <div><dt>Front</dt><dd id="front-distance">-</dd></div>
-                    <div><dt>Rear</dt><dd id="rear-distance">-</dd></div>
-                    <div><dt>Side</dt><dd id="side-distance">-</dd></div>
-                    <div><dt>Updated</dt><dd id="last-updated">-</dd></div>
+                    <div>
+                        <dt>Slot 1 Distance</dt>
+                        <dd id="metric-slot1-distance">-</dd>
+                    </div>
+                    <div>
+                        <dt>Slot 2 Distance</dt>
+                        <dd id="metric-slot2-distance">-</dd>
+                    </div>
+                    <div>
+                        <dt>Last Updated</dt>
+                        <dd id="last-updated">-</dd>
+                    </div>
                 </dl>
+
                 <h2>Events</h2>
                 <ul id="events" class="events"></ul>
             </aside>
         </section>
     </main>
+
     <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
 </body>
 </html>

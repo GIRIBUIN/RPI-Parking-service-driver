@@ -25,31 +25,42 @@ def init_db():
     conn.close()
 
 
-def insert_parking_log(
-    parking_state=None,
-    risk_state=None,
-    front_distance=None,
-    rear_distance=None,
-    side_distance=None
+def insert_slot_log(
+    slot1_state=None,
+    slot2_state=None,
+    slot1_distance=None,
+    slot2_distance=None
 ):
     conn = get_connection()
 
     conn.execute("""
-        INSERT INTO parking_log (
-            parking_state,
-            risk_state,
-            front_distance,
-            rear_distance,
-            side_distance
+        INSERT INTO slot_log (
+            slot1_state,
+            slot2_state,
+            slot1_distance,
+            slot2_distance
         )
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?)
     """, (
-        parking_state,
-        risk_state,
-        front_distance,
-        rear_distance,
-        side_distance
+        slot1_state,
+        slot2_state,
+        slot1_distance,
+        slot2_distance
     ))
+
+    conn.commit()
+    conn.close()
+
+
+def insert_lot_log(lot_state):
+    conn = get_connection()
+
+    conn.execute("""
+        INSERT INTO lot_log (
+            lot_state
+        )
+        VALUES (?)
+    """, (lot_state,))
 
     conn.commit()
     conn.close()
@@ -69,57 +80,26 @@ def insert_gate_log(gate_state):
     conn.close()
 
 
-def insert_event_log(topic, event_type, payload):
+def insert_event_log(topic, event_type=None, reason=None, payload=None):
     conn = get_connection()
 
     conn.execute("""
         INSERT INTO event_log (
             topic,
             event_type,
+            reason,
             payload
         )
-        VALUES (?, ?, ?)
+        VALUES (?, ?, ?, ?)
     """, (
         topic,
         event_type,
+        reason,
         payload
     ))
 
     conn.commit()
     conn.close()
-
-
-def get_latest_parking_state():
-    conn = get_connection()
-
-    cursor = conn.execute("""
-        SELECT *
-        FROM parking_log
-        ORDER BY id DESC
-        LIMIT 1
-    """)
-
-    row = cursor.fetchone()
-
-    conn.close()
-
-    return dict(row) if row else None
-
-
-def get_latest_gate_state():
-    conn = get_connection()
-
-    cursor = conn.execute("""
-        SELECT *
-        FROM gate_log
-        ORDER BY id DESC
-        LIMIT 1
-    """)
-
-    row = cursor.fetchone()
-    conn.close()
-
-    return dict(row) if row else None
 
 
 def get_latest_column(table_name, column_name):
@@ -129,6 +109,76 @@ def get_latest_column(table_name, column_name):
         SELECT {column_name}, timestamp
         FROM {table_name}
         WHERE {column_name} IS NOT NULL
+        ORDER BY id DESC
+        LIMIT 1
+    """)
+
+    row = cursor.fetchone()
+    conn.close()
+
+    return dict(row) if row else None
+
+
+def get_latest_slot_state():
+    conn = get_connection()
+
+    cursor = conn.execute("""
+        SELECT slot1_state, slot2_state, timestamp
+        FROM slot_log
+        WHERE slot1_state IS NOT NULL
+           OR slot2_state IS NOT NULL
+        ORDER BY id DESC
+        LIMIT 1
+    """)
+
+    row = cursor.fetchone()
+    conn.close()
+
+    return dict(row) if row else None
+
+
+def get_latest_slot_distance():
+    conn = get_connection()
+
+    cursor = conn.execute("""
+        SELECT slot1_distance, slot2_distance, timestamp
+        FROM slot_log
+        WHERE slot1_distance IS NOT NULL
+           OR slot2_distance IS NOT NULL
+        ORDER BY id DESC
+        LIMIT 1
+    """)
+
+    row = cursor.fetchone()
+    conn.close()
+
+    return dict(row) if row else None
+
+
+def get_latest_lot_state():
+    conn = get_connection()
+
+    cursor = conn.execute("""
+        SELECT lot_state, timestamp
+        FROM lot_log
+        WHERE lot_state IS NOT NULL
+        ORDER BY id DESC
+        LIMIT 1
+    """)
+
+    row = cursor.fetchone()
+    conn.close()
+
+    return dict(row) if row else None
+
+
+def get_latest_gate_state():
+    conn = get_connection()
+
+    cursor = conn.execute("""
+        SELECT gate_state, timestamp
+        FROM gate_log
+        WHERE gate_state IS NOT NULL
         ORDER BY id DESC
         LIMIT 1
     """)
@@ -156,29 +206,29 @@ def get_recent_events(limit=10):
 
 
 def get_dashboard_state():
-    parking = get_latest_column("parking_log", "parking_state")
-    risk = get_latest_column("parking_log", "risk_state")
-    front = get_latest_column("parking_log", "front_distance")
-    rear = get_latest_column("parking_log", "rear_distance")
-    side = get_latest_column("parking_log", "side_distance")
+    slot_state = get_latest_slot_state()
+    slot_distance = get_latest_slot_distance()
+    lot = get_latest_lot_state()
     gate = get_latest_gate_state()
 
+    timestamps = [
+        item["timestamp"]
+        for item in [slot_state, slot_distance, lot, gate]
+        if item and item.get("timestamp")
+    ]
+
     return {
-        "parking_state": parking["parking_state"] if parking else "UNKNOWN",
-        "risk_state": risk["risk_state"] if risk else "UNKNOWN",
-        "gate_state": gate["gate_state"] if gate else "UNKNOWN",
-        "distances": {
-            "front": front["front_distance"] if front else None,
-            "rear": rear["rear_distance"] if rear else None,
-            "side": side["side_distance"] if side else None,
+        "slot": {
+            "slot1": slot_state["slot1_state"] if slot_state else "UNKNOWN",
+            "slot2": slot_state["slot2_state"] if slot_state else "UNKNOWN",
         },
-        "last_updated": max(
-            [
-                item["timestamp"]
-                for item in [parking, risk, front, rear, side, gate]
-                if item and item.get("timestamp")
-            ],
-            default=None,
-        ),
+        "distance": {
+            "slot1": slot_distance["slot1_distance"] if slot_distance else None,
+            "slot2": slot_distance["slot2_distance"] if slot_distance else None,
+            "unit": "cm",
+        },
+        "lot_state": lot["lot_state"] if lot else "UNKNOWN",
+        "gate_state": gate["gate_state"] if gate else "UNKNOWN",
+        "last_updated": max(timestamps, default=None),
         "events": get_recent_events(),
     }
