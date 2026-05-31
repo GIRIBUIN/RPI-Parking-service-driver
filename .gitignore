@@ -26,3 +26,6 @@ captures/*
 
 # claude
 .claude/
+
+# rpi2 documentation (local development only)
+rpi2/doc/
