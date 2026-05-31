@@ -1,102 +1,73 @@
+$BrokerHost = "localhost"
 $MosquittoPub = "C:\Program Files\Mosquitto\mosquitto_pub.exe"
-$HostName = "localhost"
-$DelayMs = 200
 
-function Publish-Message {
+function Publish-Mqtt {
     param (
         [string]$Topic,
         [string]$Message
     )
 
-    & $MosquittoPub -h $HostName -t $Topic -m $Message
+    if (-not (Test-Path $MosquittoPub)) {
+        Write-Error "mosquitto_pub.exe not found: $MosquittoPub"
+        exit 1
+    }
+
+    Write-Host "PUB $Topic => $Message"
+    & $MosquittoPub -h $BrokerHost -t $Topic -m $Message
+    Start-Sleep -Milliseconds 700
 }
 
-function Publish-Frame {
-    param (
-        [string]$ParkingState,
-        [string]$RiskState,
-        [string]$GateState,
-        [double]$Front,
-        [double]$Rear,
-        [double]$Side
-    )
+Write-Host "=== Parking Monitoring Simulation Start ==="
 
-    $distance = @{
-        front = $Front
-        rear = $Rear
-        side = $Side
-    } | ConvertTo-Json -Compress
+# 1. Initial state
+Publish-Mqtt "parking/rpi1/slot" '{"slot1":"EMPTY","slot2":"EMPTY"}'
+Publish-Mqtt "parking/rpi1/distance" '{"slot1":50,"slot2":50,"unit":"cm"}'
+Publish-Mqtt "parking/rpi1/lot" "AVAILABLE"
+Publish-Mqtt "parking/rpi2/gate" "CLOSED"
 
-    Publish-Message "parking/rpi1/status" $ParkingState
-    Publish-Message "parking/rpi1/risk" $RiskState
-    Publish-Message "parking/rpi1/distance" $distance
-    Publish-Message "parking/rpi2/gate" $GateState
-    Start-Sleep -Milliseconds $DelayMs
-}
+# 2. Vehicle approaches entrance and gate opens
+Publish-Mqtt "parking/rpi2/event" '{"event":"ENTRY_OPEN","reason":"vehicle_detected"}'
+Publish-Mqtt "parking/rpi2/gate" "OPEN"
 
-function Publish-Event {
-    param ([string]$EventName)
+# 3. Gate auto closes after entry
+Publish-Mqtt "parking/rpi2/event" '{"event":"AUTO_CLOSE","reason":"timer_expired"}'
+Publish-Mqtt "parking/rpi2/gate" "CLOSED"
 
-    Publish-Message "parking/rpi1/event" $EventName
-}
+# 4. Vehicle parks in Slot 1
+Publish-Mqtt "parking/rpi1/slot" '{"slot1":"OCCUPIED","slot2":"EMPTY"}'
+Publish-Mqtt "parking/rpi1/distance" '{"slot1":12,"slot2":50,"unit":"cm"}'
+Publish-Mqtt "parking/rpi1/lot" "AVAILABLE"
 
-while ($true) {
-    Publish-Frame "EMPTY" "SAFE" "OPEN" 50 80 26
-    Publish-Frame "EMPTY" "SAFE" "OPEN" 50 80 26
+# 5. Another vehicle enters
+Publish-Mqtt "parking/rpi2/event" '{"event":"ENTRY_OPEN","reason":"vehicle_detected"}'
+Publish-Mqtt "parking/rpi2/gate" "OPEN"
+Publish-Mqtt "parking/rpi2/event" '{"event":"AUTO_CLOSE","reason":"timer_expired"}'
+Publish-Mqtt "parking/rpi2/gate" "CLOSED"
 
-    Publish-Event "vehicle_waiting_at_barrier"
-    foreach ($front in 50, 44, 38, 32, 26, 20) {
-        Publish-Frame "APPROACHING" "SAFE" "OPEN" $front 80 26
-    }
+# 6. Vehicle parks in Slot 2, parking lot becomes full
+Publish-Mqtt "parking/rpi1/slot" '{"slot1":"OCCUPIED","slot2":"OCCUPIED"}'
+Publish-Mqtt "parking/rpi1/distance" '{"slot1":12,"slot2":10,"unit":"cm"}'
+Publish-Mqtt "parking/rpi1/lot" "FULL"
 
-    foreach ($front in 16, 12, 8, 4, 0) {
-        Publish-Frame "APPROACHING" "SAFE" "OPEN" $front 75 26
-    }
+# 7. Vehicle approaches while lot is full
+# Realistic scenario:
+# The gate opens, but Dashboard/LED indicates FULL and the vehicle turns around inside.
+Publish-Mqtt "parking/rpi2/event" '{"event":"ENTRY_OPEN","reason":"vehicle_detected_full_lot"}'
+Publish-Mqtt "parking/rpi2/gate" "OPEN"
+Publish-Mqtt "parking/rpi2/event" '{"event":"AUTO_CLOSE","reason":"timer_expired"}'
+Publish-Mqtt "parking/rpi2/gate" "CLOSED"
 
-    Publish-Event "rear_tracking_started"
-    foreach ($frame in @(
-        @{ front = 0; rear = 50; side = 22; risk = "SAFE" },
-        @{ front = 0; rear = 46; side = 22; risk = "SAFE" },
-        @{ front = 0; rear = 42; side = 21; risk = "SAFE" },
-        @{ front = 0; rear = 36; side = 21; risk = "SAFE" },
-        @{ front = 0; rear = 30; side = 20; risk = "SAFE" },
-        @{ front = 0; rear = 24; side = 20; risk = "SAFE" }
-    )) {
-        Publish-Frame "PARKING" $frame.risk "OPEN" $frame.front $frame.rear $frame.side
-    }
+# 8. Exit request
+Publish-Mqtt "parking/rpi2/event" '{"event":"EXIT_OPEN","reason":"switch_pressed"}'
+Publish-Mqtt "parking/rpi2/gate" "OPEN"
 
-    Publish-Event "rear_warning"
-    foreach ($frame in @(
-        @{ front = 0; rear = 18; side = 20; risk = "WARNING" },
-        @{ front = 0; rear = 14; side = 20; risk = "WARNING" },
-        @{ front = 0; rear = 11; side = 19; risk = "WARNING" }
-    )) {
-        Publish-Frame "PARKING" $frame.risk "OPEN" $frame.front $frame.rear $frame.side
-    }
+# 9. Slot 1 becomes empty after vehicle exits
+Publish-Mqtt "parking/rpi1/slot" '{"slot1":"EMPTY","slot2":"OCCUPIED"}'
+Publish-Mqtt "parking/rpi1/distance" '{"slot1":50,"slot2":10,"unit":"cm"}'
+Publish-Mqtt "parking/rpi1/lot" "AVAILABLE"
 
-    Publish-Event "rear_danger"
-    Publish-Frame "PARKING" "DANGER" "OPEN" 0 9 19
-    Publish-Frame "PARKING" "DANGER" "OPEN" 0 7 19
+# 10. Gate auto closes after exit
+Publish-Mqtt "parking/rpi2/event" '{"event":"AUTO_CLOSE","reason":"timer_expired"}'
+Publish-Mqtt "parking/rpi2/gate" "CLOSED"
 
-    Publish-Event "rear_collision"
-    Publish-Frame "PARKING" "DANGER" "OPEN" 0 4 19
-    Publish-Frame "PARKING" "DANGER" "OPEN" 0 4 19
-
-    Publish-Event "move_forward_to_recover"
-    foreach ($frame in @(
-        @{ front = 0; rear = 8; side = 19; risk = "DANGER" },
-        @{ front = 0; rear = 12; side = 19; risk = "WARNING" },
-        @{ front = 0; rear = 16; side = 19; risk = "WARNING" },
-        @{ front = 0; rear = 19; side = 19; risk = "SAFE" }
-    )) {
-        Publish-Frame "PARKING" $frame.risk "OPEN" $frame.front $frame.rear $frame.side
-    }
-
-    Publish-Event "parking_completed"
-    Publish-Frame "PARKED" "SAFE" "OPEN" 0 19 19
-    Publish-Frame "PARKED" "SAFE" "OPEN" 0 19 19
-
-    Publish-Message "parking/rpi2/event" "gate_closed"
-    Publish-Frame "PARKED" "SAFE" "CLOSED" 0 19 19
-    Start-Sleep -Milliseconds 1000
-}
+Write-Host "=== Parking Monitoring Simulation End ==="

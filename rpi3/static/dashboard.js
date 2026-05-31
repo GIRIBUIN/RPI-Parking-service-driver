@@ -1,111 +1,128 @@
-function valueOrDash(value, unit) {
+const POLL_INTERVAL_MS = 500;
+
+function textOrUnknown(value) {
+    if (value === null || value === undefined || value === "") {
+        return "UNKNOWN";
+    }
+    return value;
+}
+
+function formatDistance(value) {
     if (value === null || value === undefined) {
         return "-";
     }
-    return unit ? `${value} ${unit}` : value;
+    return `${value} cm`;
 }
 
 function setText(id, value) {
-    document.getElementById(id).textContent = value;
-}
-
-function vehicleLeftFromFront(frontDistance) {
-    if (frontDistance === null || frontDistance === undefined) {
-        return null;
+    const element = document.getElementById(id);
+    if (!element) {
+        return;
     }
-
-    const maxFront = 50;
-    const minFront = 0;
-    const vehicleHalfLength = 7.5;
-    const clampedFront = Math.min(maxFront, Math.max(minFront, frontDistance));
-
-    return -((clampedFront + vehicleHalfLength) / 50) * 100;
+    element.textContent = value;
 }
 
-function vehicleLeftFromRear(rearDistance) {
-    if (rearDistance !== null && rearDistance !== undefined) {
-        const maxRear = 80;
-        const minRear = 4;
-        const slotLength = 50;
-        const vehicleHalfLength = 7.5;
-        const clampedRear = Math.min(maxRear, Math.max(minRear, rearDistance));
-        const centerFromSlotFront = slotLength - clampedRear - vehicleHalfLength;
-
-        return (centerFromSlotFront / slotLength) * 100;
-    }
-
-    return null;
-}
-
-function vehicleLeftFromDistance(state, distances) {
-    if (state === "APPROACHING") {
-        return vehicleLeftFromFront(distances.front);
-    }
-
-    return vehicleLeftFromRear(distances.rear);
-}
-
-function updateVehicle(state, distances) {
-    const vehicle = document.getElementById("vehicle");
-    vehicle.className = "vehicle";
-    vehicle.style.left = "";
-
-    if (state === "EMPTY" || state === "UNKNOWN") {
+function setStateClass(element, baseClass, state) {
+    if (!element) {
         return;
     }
 
-    vehicle.classList.add("active");
+    element.className = baseClass;
 
-    const measuredLeft = vehicleLeftFromDistance(state, distances);
-    if (measuredLeft !== null) {
-        vehicle.style.left = `${measuredLeft}%`;
+    if (!state) {
+        element.classList.add("unknown");
+        return;
     }
 
-    if (state === "APPROACHING") {
-        vehicle.classList.add("approaching");
-    } else if (state === "PARKING") {
-        vehicle.classList.add("parking");
-    } else {
-        vehicle.classList.add("parked");
+    element.classList.add(String(state).toLowerCase());
+}
+
+function updateSlot(slotId, state, distance) {
+    const slotElement = document.getElementById(slotId);
+    const normalizedState = textOrUnknown(state);
+
+    setStateClass(slotElement, "slot", normalizedState);
+
+    setText(`${slotId}-state`, normalizedState);
+    setText(`${slotId}-distance`, formatDistance(distance));
+    setText(`metric-${slotId}-distance`, formatDistance(distance));
+}
+
+function updateLotState(state) {
+    const normalizedState = textOrUnknown(state);
+    setText("lot-state", normalizedState);
+
+    const lotElement = document.getElementById("lot-state");
+    if (!lotElement) {
+        return;
     }
+
+    lotElement.className = "";
+    lotElement.classList.add(normalizedState.toLowerCase());
 }
 
 function updateGate(state) {
-    const gate = document.getElementById("gate");
-    gate.className = "gate";
+    const normalizedState = textOrUnknown(state);
+    setText("gate-state", normalizedState);
 
-    if (state === "OPEN") {
-        gate.classList.add("open");
-    }
+    const gateElement = document.getElementById("gate");
+    setStateClass(gateElement, "gate", normalizedState);
 }
 
 function updateEvents(events) {
-    const list = document.getElementById("events");
-    list.innerHTML = "";
+    const eventList = document.getElementById("events");
+    if (!eventList) {
+        return;
+    }
+
+    eventList.innerHTML = "";
+
+    if (!events || events.length === 0) {
+        const item = document.createElement("li");
+        item.textContent = "No events";
+        eventList.appendChild(item);
+        return;
+    }
 
     events.forEach((event) => {
         const item = document.createElement("li");
-        item.textContent = `${event.timestamp} | ${event.topic} | ${event.event_type}`;
-        list.appendChild(item);
+
+        const timestamp = event.timestamp || "-";
+        const eventType = event.event_type || "unknown_event";
+        const reason = event.reason ? ` (${event.reason})` : "";
+        const topic = event.topic || "";
+
+        item.textContent = `[${timestamp}] ${eventType}${reason} ${topic}`;
+        eventList.appendChild(item);
     });
 }
 
-async function loadState() {
-    const response = await fetch("/api/state");
-    const state = await response.json();
+async function fetchState() {
+    try {
+        const response = await fetch("/api/state", {
+            cache: "no-store",
+        });
 
-    setText("parking-state", state.parking_state);
-    setText("risk-state", state.risk_state);
-    setText("gate-state", state.gate_state);
-    setText("front-distance", valueOrDash(state.distances.front, "cm"));
-    setText("rear-distance", valueOrDash(state.distances.rear, "cm"));
-    setText("side-distance", valueOrDash(state.distances.side, "cm"));
-    setText("last-updated", valueOrDash(state.last_updated));
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
 
-    updateVehicle(state.parking_state, state.distances);
-    updateGate(state.gate_state);
-    updateEvents(state.events || []);
+        const data = await response.json();
+
+        const slot = data.slot || {};
+        const distance = data.distance || {};
+
+        updateSlot("slot1", slot.slot1, distance.slot1);
+        updateSlot("slot2", slot.slot2, distance.slot2);
+        updateLotState(data.lot_state);
+        updateGate(data.gate_state);
+
+        setText("last-updated", data.last_updated || "-");
+        updateEvents(data.events || []);
+    } catch (error) {
+        console.error("Failed to fetch dashboard state:", error);
+    }
 }
 
-loadState();
-setInterval(loadState, 200);
+fetchState();
+setInterval(fetchState, POLL_INTERVAL_MS);
