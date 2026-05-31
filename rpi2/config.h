@@ -2,9 +2,13 @@
 #define CONFIG_H
 
 // GPIO 핀 (BCM)
-#define SERVO_PIN       18
-#define LED_PIN         24
-#define SWITCH_PIN      23
+#define SERVO_PIN            18
+#define ENTRY_LED_PIN        24
+#define SWITCH_PIN           23
+#define ULTRASONIC_TRIG_PIN  17
+#define ULTRASONIC_ECHO_PIN  27
+#define BUZZER_PIN           22
+#define FULL_LED_PIN         25
 
 // 서보 PWM (나노초 단위)
 // 50Hz = 20ms = 20000000ns 주기
@@ -21,12 +25,16 @@
 #define MQTT_CLIENT_ID  "rpi2_gate"
 #define MQTT_KEEPALIVE  60
 
-#define TOPIC_SUB_GATE_CMD   "parking/control/gate"
+#define TOPIC_SUB_CAPACITY   "parking/rpi3/capacity"
 #define TOPIC_PUB_GATE_STATE "parking/rpi2/gate"
 #define TOPIC_PUB_EVENT      "parking/rpi2/event"
 
-// 디바운싱 및 Failsafe
-#define DEBOUNCE_MS     300
-#define FAILSAFE_SEC    10
+// 디바운싱 및 타이머
+#define DEBOUNCE_MS          300
+#define ENTRY_CLOSE_DELAY_SEC 5
+#define EXIT_TIMEOUT_SEC     10
+
+// 초음파 임계값 (cm)
+#define VEHICLE_DETECT_CM    50
 
 #endif
