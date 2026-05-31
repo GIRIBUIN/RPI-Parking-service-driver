@@ -13,8 +13,11 @@ void gate_controller_init(void);
 void gate_open(void);
 void gate_close(void);
 
-// 상태 조회
-GateState gate_get_state(void);
+// LED 제어
+void entry_led_on(void);
+void entry_led_off(void);
+void full_led_on(void);
+void full_led_off(void);
 
 // 정리
 void gate_controller_cleanup(void);

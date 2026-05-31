@@ -125,10 +125,15 @@ static int set_pwm_duty(int duty_ns) {
 }
 
 void gate_controller_init(void) {
-  // LED GPIO export 및 설정
-  export_gpio(LED_PIN);
-  set_gpio_direction(LED_PIN, "out");
-  set_gpio_value(LED_PIN, 0);
+  // 입차 LED GPIO export 및 설정
+  export_gpio(ENTRY_LED_PIN);
+  set_gpio_direction(ENTRY_LED_PIN, "out");
+  set_gpio_value(ENTRY_LED_PIN, 0);
+
+  // 만차 LED GPIO export 및 설정
+  export_gpio(FULL_LED_PIN);
+  set_gpio_direction(FULL_LED_PIN, "out");
+  set_gpio_value(FULL_LED_PIN, 0);
 
   // 서보 PWM 설정
   setup_pwm();
@@ -152,7 +157,6 @@ void gate_open(void) {
   set_pwm_duty(0);
 
   current_state = GATE_OPEN;
-  set_gpio_value(LED_PIN, 0);
 
   pthread_mutex_unlock(&gate_mutex);
 }
@@ -173,16 +177,24 @@ void gate_close(void) {
   set_pwm_duty(0);
 
   current_state = GATE_CLOSED;
-  set_gpio_value(LED_PIN, 1);
 
   pthread_mutex_unlock(&gate_mutex);
 }
 
-GateState gate_get_state(void) {
-  pthread_mutex_lock(&gate_mutex);
-  GateState state = current_state;
-  pthread_mutex_unlock(&gate_mutex);
-  return state;
+void entry_led_on(void) {
+  set_gpio_value(ENTRY_LED_PIN, 1);
+}
+
+void entry_led_off(void) {
+  set_gpio_value(ENTRY_LED_PIN, 0);
+}
+
+void full_led_on(void) {
+  set_gpio_value(FULL_LED_PIN, 1);
+}
+
+void full_led_off(void) {
+  set_gpio_value(FULL_LED_PIN, 0);
 }
 
 void gate_controller_cleanup(void) {
@@ -204,6 +216,8 @@ void gate_controller_cleanup(void) {
   }
 
   // LED GPIO unexport
-  set_gpio_value(LED_PIN, 0);
-  unexport_gpio(LED_PIN);
+  entry_led_off();
+  full_led_off();
+  unexport_gpio(ENTRY_LED_PIN);
+  unexport_gpio(FULL_LED_PIN);
 }
