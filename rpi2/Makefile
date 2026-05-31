@@ -3,7 +3,7 @@ CFLAGS = -Wall -pthread
 LIBS = -lmosquitto -lpthread
 
 TARGET = gate_node
-SRCS = main.c gate_controller.c switch_handler.c mqtt_client.c
+SRCS = main.c gate_controller.c switch_handler.c mqtt_client.c ultrasonic.c buzzer.c
 OBJS = $(SRCS:.c=.o)
 
 .PHONY: all clean
