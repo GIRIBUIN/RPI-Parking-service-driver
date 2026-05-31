@@ -39,15 +39,15 @@
 - [x] **Task 3.1**: 출차 요청용 Switch 버튼 결선. GPIO 풀업/풀다운 저항을 활용하여 버튼 클릭 시 하드웨어 인터럽트(Interrupt)가 발생하도록 코드 작성.
   - 테스트: Switch 버튼 클릭 시 인터럽트 감지 및 콜백 호출 확인
 - [ ] **Task 3.2**: 게이트 Open/Close 상태를 표시할 외부 LED 점등/소등 테스트.
-- [ ] **Task 3.3**: `make` 빌드 성공 확인 및 실행 파일 생성.
+- [x] **Task 3.3**: `make` 빌드 성공 확인 및 실행 파일 생성.
 
 **[2주 차] 시나리오 기반 제어 로직 및 MQTT 연동**
-- [ ] **Task 1.1**: Rpi #3의 MQTT 브로커에 연결하여 게이트 제어 토픽(`parking/control/gate`)을 구독(Subscribe)하는 코드 작성.
-- [ ] **Task 2.1**: 게이트 제어 시나리오 코드 적용.
+- [x] **Task 1.1**: Rpi #3의 MQTT 브로커에 연결하여 게이트 제어 토픽(`parking/control/gate`)을 구독(Subscribe)하는 코드 작성.
+- [x] **Task 2.1**: 게이트 제어 시나리오 코드 적용.
   - 기본 상태: 모터 `OPEN` 유지.
   - `parking/control/gate` 토픽에서 `CLOSE` 명령 수신 시: 모터 `CLOSED` 제어.
-- [ ] **Task 3.1**: 출차 Switch 버튼 클릭 시 즉시 모터를 `OPEN`으로 제어하고, 출차 요청 이벤트를 MQTT로 퍼블리시하는 기능 구현.
-- [ ] **Task 3.2**: 게이트 상태(`OPEN`/`CLOSED`) 변경 시 `parking/rpi2/gate` 토픽으로 상태를 퍼블리시하는 기능 구현.
+- [x] **Task 3.1**: 출차 Switch 버튼 클릭 시 즉시 모터를 `OPEN`으로 제어하고, 출차 요청 이벤트를 MQTT로 퍼블리시하는 기능 구현.
+- [x] **Task 3.2**: 게이트 상태(`OPEN`/`CLOSED`) 변경 시 `parking/rpi2/gate` 토픽으로 상태를 퍼블리시하는 기능 구현.
 
 **[3주 차] 게이트 모형 조립 및 1차 통합 테스트**
 - [ ] **Task 1.1**: 물리적 바리게이트 모형에 서보 모터와 스위치를 단단히 고정.
