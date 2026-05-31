@@ -1,10 +1,10 @@
 #ifndef MQTT_CLIENT_H
 #define MQTT_CLIENT_H
 
-typedef void (*MqttCommandCallback)(const char *cmd);
+typedef void (*MqttCapacityCallback)(const char *status);
 
 // MQTT 클라이언트 초기화
-void mqtt_client_init(MqttCommandCallback on_gate_cmd);
+void mqtt_client_init(MqttCapacityCallback on_capacity);
 
 // MQTT 브로커 연결
 void mqtt_connect(void);

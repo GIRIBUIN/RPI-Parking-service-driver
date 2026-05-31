@@ -10,7 +10,7 @@
 #define MAX_PAYLOAD 256
 
 static struct mosquitto *mosq = NULL;
-static MqttCommandCallback mqtt_cmd_callback = NULL;
+static MqttCapacityCallback mqtt_capacity_callback = NULL;
 static int is_mqtt_connected = 0;
 static pthread_mutex_t mqtt_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -21,8 +21,8 @@ static void on_connect(struct mosquitto *mosq, void *obj, int result) {
     is_mqtt_connected = 1;
     pthread_mutex_unlock(&mqtt_mutex);
 
-    mosquitto_subscribe(mosq, NULL, TOPIC_SUB_GATE_CMD, 1);
-    printf("구독: %s\n", TOPIC_SUB_GATE_CMD);
+    mosquitto_subscribe(mosq, NULL, TOPIC_SUB_CAPACITY, 1);
+    printf("구독: %s\n", TOPIC_SUB_CAPACITY);
   } else {
     printf("MQTT 연결 실패 (코드: %d)\n", result);
     pthread_mutex_lock(&mqtt_mutex);
@@ -47,15 +47,15 @@ static void on_message(struct mosquitto *mosq, void *obj,
             msg->payloadlen < MAX_PAYLOAD - 1 ? msg->payloadlen : MAX_PAYLOAD - 1);
   }
 
-  if (strcmp(msg->topic, TOPIC_SUB_GATE_CMD) == 0) {
-    if (mqtt_cmd_callback) {
-      mqtt_cmd_callback(payload);
+  if (strcmp(msg->topic, TOPIC_SUB_CAPACITY) == 0) {
+    if (mqtt_capacity_callback) {
+      mqtt_capacity_callback(payload);
     }
   }
 }
 
-void mqtt_client_init(MqttCommandCallback on_gate_cmd) {
-  mqtt_cmd_callback = on_gate_cmd;
+void mqtt_client_init(MqttCapacityCallback on_capacity) {
+  mqtt_capacity_callback = on_capacity;
 
   mosquitto_lib_init();
 
