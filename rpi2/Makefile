@@ -6,7 +6,12 @@ TARGET = gate_node
 SRCS = main.c gate_controller.c switch_handler.c mqtt_client.c ultrasonic.c buzzer.c
 OBJS = $(SRCS:.c=.o)
 
-.PHONY: all clean
+# RPI2 배포 설정
+RPI2_USER = pi
+RPI2_IP   = 10.10.10.12
+RPI2_DIR  = ~/
+
+.PHONY: all clean scp
 
 all: $(TARGET)
 
@@ -18,3 +23,6 @@ $(TARGET): $(OBJS)
 
 clean:
 	rm -f $(OBJS) $(TARGET)
+
+scp:
+	scp $(TARGET) $(RPI2_USER)@$(RPI2_IP):$(RPI2_DIR)
