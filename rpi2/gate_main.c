@@ -33,8 +33,8 @@ static struct task_struct *state_thread;
 static time64_t last_vehicle_detect = 0;
 static time64_t exit_request_time = 0;
 
-// 부저 패턴 카운터 (0.5초 on/off, 6초 총)
-static int buzzer_ticks = 0;
+// 부저 페이즈 (0~9 순환, 0~4:on, 5~9:off)
+static int buzzer_phase = 0;
 
 SystemState gate_get_state(void) {
   SystemState state;
@@ -79,9 +79,8 @@ void on_switch_press(void) {
   SystemState state = gate_get_state();
 
   if (state == STATE_IDLE) {
-    pr_info("[SWITCH] 출차 요청 — LED ON, 부저 ON, 게이트 OPEN, 10초 타이머 시작\n");
+    pr_info("[SWITCH] 출차 요청 — LED ON, 게이트 OPEN, 10초 타이머 시작\n");
     entry_led_set(1);
-    buzzer_ticks = 60;
     gate_open();
     exit_request_time = ktime_get_seconds();
     gate_set_state(STATE_EXIT_REQUESTED);
@@ -110,10 +109,9 @@ static int state_machine_thread_fn(void *data) {
     switch (state) {
     case STATE_IDLE:
       if (distance_cm > 0 && distance_cm <= VEHICLE_DETECT_CM) {
-        pr_info("[%d cm] 입차 차량 감지 — LED ON, 부저 ON, 게이트 OPEN\n", distance_cm);
+        pr_info("[%d cm] 입차 차량 감지 — LED ON, 게이트 OPEN\n", distance_cm);
         gate_set_state(STATE_ENTRY_DETECTED);  // BUG-4: 상태 먼저 변경
         entry_led_set(1);
-        buzzer_ticks = 60;
         gate_open();
         last_vehicle_detect = now;
       } else if (distance_cm > 0) {
@@ -127,8 +125,6 @@ static int state_machine_thread_fn(void *data) {
         last_vehicle_detect = now;
       } else if (distance_cm > VEHICLE_DETECT_CM) {
         pr_info("[%d cm] 차량 사라짐 — 5초 타이머 시작\n", distance_cm);
-        buzzer_ticks = 0;
-        buzzer_off();
         last_vehicle_detect = now;
         gate_set_state(STATE_ENTRY_WAITING);
       }
@@ -156,12 +152,10 @@ static int state_machine_thread_fn(void *data) {
       } else {
         elapsed = now - exit_request_time;
         if (elapsed >= EXIT_TIMEOUT_SEC) {
-          pr_info("10초 경과 (차량 미감지) — LED OFF, 부저 OFF, 게이트 닫음 (타임아웃)\n");
+          pr_info("10초 경과 (차량 미감지) — LED OFF, 게이트 닫음 (타임아웃)\n");
           gate_set_state(STATE_IDLE);  // BUG-4: 상태 먼저 변경
-          buzzer_ticks = 0;
           gate_close();
           entry_led_set(0);
-          buzzer_off();
         }
       }
       break;
@@ -171,36 +165,33 @@ static int state_machine_thread_fn(void *data) {
         pr_debug("[EXIT] 거리: %d cm\n", distance_cm);
         last_vehicle_detect = now;
       } else if (distance_cm > VEHICLE_DETECT_CM) {
-        pr_info("[%d cm] 차량 빠져나감 — 출차 완료, LED OFF, 부저 OFF, 게이트 닫음\n", distance_cm);
-        buzzer_ticks = 0;
+        pr_info("[%d cm] 차량 빠져나감 — 출차 완료, LED OFF, 게이트 닫음\n", distance_cm);
         gate_close();
         entry_led_set(0);
-        buzzer_off();
         gate_set_state(STATE_IDLE);
       }
 
       elapsed = now - exit_request_time;
       if (elapsed >= EXIT_TIMEOUT_SEC) {
-        pr_info("10초 경과 (차량 미감지) — LED OFF, 부저 OFF, 게이트 닫음 (타임아웃)\n");
-        buzzer_ticks = 0;
+        pr_info("10초 경과 (차량 미감지) — LED OFF, 게이트 닫음 (타임아웃)\n");
         gate_close();
         entry_led_set(0);
-        buzzer_off();
         gate_set_state(STATE_IDLE);
       }
       break;
     }
 
-    // 부저 패턴 처리 (0.5초 on/off, 총 6초)
-    if (buzzer_ticks > 0) {
-      int elapsed = 60 - buzzer_ticks;
-      buzzer_ticks--;
-      if ((elapsed / 5) % 2 == 0) {
+    // 부저 패턴 처리 (상태에 따라 0.5초 on/off 반복 또는 OFF)
+    state = gate_get_state();
+    if (state != STATE_IDLE) {
+      buzzer_phase = (buzzer_phase + 1) % 10;
+      if (buzzer_phase < 5)
         buzzer_on();
-      } else {
+      else
         buzzer_off();
-      }
-      if (buzzer_ticks == 0) {
+    } else {
+      if (buzzer_phase != 0) {
+        buzzer_phase = 0;
         buzzer_off();
       }
     }
