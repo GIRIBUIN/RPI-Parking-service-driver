@@ -25,6 +25,7 @@ static SystemState sys_state = STATE_IDLE;
 static time_t state_timer = 0;
 static pthread_mutex_t state_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int idle_log_count = 0;  // IDLE 상태에서 3초마다 거리 출력용
+static int buzzer_ticks = 0;    // 부저 패턴 카운터 (0.5초 on/off, 6초 총)
 
 static void on_capacity(const char *status) {
   if (strcmp(status, "FULL") == 0) {
@@ -54,10 +55,12 @@ static void on_switch_press(void) {
     state_timer = time(NULL);
     pthread_mutex_unlock(&state_mutex);
 
-    gate_open();
     entry_led_on();
-    buzzer_on();
-    printf("출차 요청 — 게이트 OPEN, LED ON, 부저 ON, 10초 타이머 시작\n");
+    pthread_mutex_lock(&state_mutex);
+    buzzer_ticks = 60;
+    pthread_mutex_unlock(&state_mutex);
+    gate_open();
+    printf("출차 요청 — LED ON, 부저 ON, 게이트 OPEN, 10초 타이머 시작\n");
   }
 }
 
@@ -117,10 +120,12 @@ int main(void) {
         state_timer = now;
         pthread_mutex_unlock(&state_mutex);
 
-        gate_open();
         entry_led_on();
-        buzzer_on();
-        printf("[%.1f cm] 입차 차량 감지 — 게이트 OPEN, LED ON, 부저 ON\n", dist);
+        pthread_mutex_lock(&state_mutex);
+        buzzer_ticks = 60;
+        pthread_mutex_unlock(&state_mutex);
+        gate_open();
+        printf("[%.1f cm] 입차 차량 감지 — LED ON, 부저 ON, 게이트 OPEN\n", dist);
       }
       break;
 
@@ -130,6 +135,7 @@ int main(void) {
         pthread_mutex_lock(&state_mutex);
         sys_state = STATE_ENTRY_WAITING;
         state_timer = now;
+        buzzer_ticks = 0;
         pthread_mutex_unlock(&state_mutex);
 
         buzzer_off();
@@ -143,10 +149,10 @@ int main(void) {
         pthread_mutex_lock(&state_mutex);
         sys_state = STATE_ENTRY_DETECTED;
         state_timer = now;
+        buzzer_ticks = 60;
         pthread_mutex_unlock(&state_mutex);
 
-        buzzer_on();
-        printf("[%.1f cm] 차량 재감지 — 입차 상태 복귀\n", dist);
+        printf("[%.1f cm] 차량 재감지 — 입차 상태 복귀, 부저 재시작\n", dist);
       } else if (now - state_timer >= ENTRY_CLOSE_DELAY_SEC) {
         // 5초 경과 — 게이트 닫음
         pthread_mutex_lock(&state_mutex);
@@ -171,6 +177,7 @@ int main(void) {
         // 10초 경과 — 타임아웃, 게이트 닫음
         pthread_mutex_lock(&state_mutex);
         sys_state = STATE_IDLE;
+        buzzer_ticks = 0;
         pthread_mutex_unlock(&state_mutex);
 
         entry_led_off();
@@ -185,6 +192,7 @@ int main(void) {
         // 차량 빠져나감 — 출차 완료
         pthread_mutex_lock(&state_mutex);
         sys_state = STATE_IDLE;
+        buzzer_ticks = 0;
         pthread_mutex_unlock(&state_mutex);
 
         entry_led_off();
@@ -193,6 +201,25 @@ int main(void) {
         printf("[%.1f cm] 차량 빠져나감 — 출차 완료, LED OFF, 부저 OFF, 게이트 닫음\n", dist);
       }
       break;
+    }
+
+    // 부저 패턴 처리 (0.5초 on/off, 총 6초)
+    pthread_mutex_lock(&state_mutex);
+    if (buzzer_ticks > 0) {
+      int elapsed = 60 - buzzer_ticks;
+      buzzer_ticks--;
+      int ticks_left = buzzer_ticks;
+      pthread_mutex_unlock(&state_mutex);
+      if ((elapsed / 5) % 2 == 0) {
+        buzzer_on();
+      } else {
+        buzzer_off();
+      }
+      if (ticks_left == 0) {
+        buzzer_off();
+      }
+    } else {
+      pthread_mutex_unlock(&state_mutex);
     }
 
     usleep(100000);  // 100ms
