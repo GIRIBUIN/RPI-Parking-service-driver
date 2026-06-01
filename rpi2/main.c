@@ -57,8 +57,6 @@ static void on_switch_press(void) {
     gate_open();
     entry_led_on();
     buzzer_on();
-    mqtt_publish_gate_state("OPEN");
-    mqtt_publish_event("exit_requested");
     printf("출차 요청 — 게이트 OPEN, LED ON, 부저 ON, 10초 타이머 시작\n");
   }
 }
@@ -92,7 +90,6 @@ int main(void) {
   gate_close();
   entry_led_off();
   buzzer_off();
-  mqtt_publish_gate_state("CLOSED");
   printf("게이트 초기 상태: CLOSED\n");
 
   // 메인 루프 — 100ms 폴링 (10Hz)
@@ -123,8 +120,6 @@ int main(void) {
         gate_open();
         entry_led_on();
         buzzer_on();
-        mqtt_publish_gate_state("OPEN");
-        mqtt_publish_event("entry_detected");
         printf("[%.1f cm] 입차 차량 감지 — 게이트 OPEN, LED ON, 부저 ON\n", dist);
       }
       break;
@@ -160,7 +155,6 @@ int main(void) {
 
         gate_close();
         entry_led_off();
-        mqtt_publish_gate_state("CLOSED");
         printf("5초 경과 — 게이트 닫음, LED OFF\n");
       }
       break;
@@ -182,7 +176,6 @@ int main(void) {
         entry_led_off();
         buzzer_off();
         gate_close();
-        mqtt_publish_gate_state("CLOSED");
         printf("10초 경과 (차량 미감지) — LED OFF, 부저 OFF, 게이트 닫음 (타임아웃)\n");
       }
       break;
@@ -197,8 +190,6 @@ int main(void) {
         entry_led_off();
         buzzer_off();
         gate_close();
-        mqtt_publish_gate_state("CLOSED");
-        mqtt_publish_event("exit_completed");
         printf("[%.1f cm] 차량 빠져나감 — 출차 완료, LED OFF, 부저 OFF, 게이트 닫음\n", dist);
       }
       break;

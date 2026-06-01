@@ -136,13 +136,7 @@ mosquitto -d
 mosquitto
 ```
 
-### 터미널 B: MQTT 토픽 모니터링
-
-```bash
-mosquitto_sub -h 127.0.0.1 -t "parking/rpi2/#" -v
-```
-
-### 터미널 C: gate_node 실행
+### 터미널 B: gate_node 실행
 
 ```bash
 cd ~/RPI_parking_service/rpi2
@@ -163,68 +157,69 @@ MQTT 연결 성공
 [IDLE] 거리: 120.3 cm        (← 3초마다 반복)
 ```
 
-**주의: 터미널 D에서 아래 테스트 시나리오 실행**
+**주의: 터미널 C에서 아래 테스트 시나리오 실행**
 
 ---
 
 ## 테스트 시나리오
 
 ### ⚠️ 주의사항
-- **MQTT 토픽 테스트**: Ubuntu에서 가능 (로컬호스트 127.0.0.1)
-- **GPIO 물리 테스트** (센서, LED, 부저, 버튼): 실제 RPI 하드웨어 필요
-  - Ubuntu의 sysfs GPIO는 실제 하드웨어 없음
-  - Ubuntu에서 테스트 완료 후 RPI로 배포 권장
+RPI2는 **MQTT 수신만** 수행 (`parking/rpi3/capacity` 구독)
+발행 기능 없음 → 게이트 상태/이벤트는 로그로만 확인
+
+**GPIO 물리 테스트** (센서, LED, 부저, 버튼): 실제 RPI 하드웨어 필요
+- Ubuntu의 sysfs GPIO는 실제 하드웨어 없음
+- Ubuntu에서 로그 확인 후 RPI로 배포 권장
 
 ### 시나리오 1: 입차 감지 및 자동 닫힘
 
-**MQTT 로그 확인 (Ubuntu에서 가능):**
+**터미널 B(gate_node) 로그 확인:**
 ```bash
-# 터미널 B에서 mosquitto_sub 모니터링 중
 [IDLE] 거리: 45.2 cm         (← 센서 감지 시)
 [45.2 cm] 입차 차량 감지 — 게이트 OPEN, LED ON, 부저 ON
-[MQTT 발행] parking/rpi2/gate → OPEN
-[MQTT 발행] parking/rpi2/event → {"event":"entry_detected",...}
 ```
 
-**물리 테스트 (실제 RPI에서만 가능):**
+**실제 RPI에서 물리 테스트:**
 1. 손을 초음파 센서 앞에 **50cm 이내로 가져가기**
-   - 예상: 게이트 열림 (서보 회전), 입차 LED 켜짐, 부저 울림
-   - MQTT 토픽: `parking/rpi2/gate` = `OPEN`
-   - 이벤트: `parking/rpi2/event` = `{"event": "entry_detected", "timestamp": ...}`
+   - 예상 로그: `[XX.X cm] 입차 차량 감지 — 게이트 OPEN, LED ON, 부저 ON`
+   - 실제: 게이트 열림, 입차 LED 켜짐, 부저 울림
 
 2. 손을 **센서에서 치우기**
+   - 예상 로그: `[XX.X cm] 차량 사라짐 — 5초 타이머 시작`
    - 예상: 부저 꺼짐 (즉시), 5초 대기
 
 3. **5초 경과 후**
-   - 예상: 게이트 닫힘, 입차 LED 꺼짐
-   - MQTT: `parking/rpi2/gate` = `CLOSED`
+   - 예상 로그: `5초 경과 — 게이트 닫음, LED OFF`
+   - 실제: 게이트 닫힘, 입차 LED 꺼짐
 
 ---
 
 ### 시나리오 2: 출차 요청
 
-**물리 테스트:**
+**실제 RPI 물리 테스트:**
 1. **버튼 누르기** (GPIO 23)
-   - 예상: 게이트 열림, 부저 울리지 않음
-   - MQTT: `parking/rpi2/event` = `{"event": "exit_requested", "timestamp": ...}`
+   - 예상 로그: `출차 요청 — 게이트 OPEN, LED ON, 부저 ON, 10초 타이머 시작`
+   - 실제: 게이트 열림, LED 켜짐, 부저 울림
 
 2. **센서 앞에 손 가져가기** (차량 감지)
-   - 예상: 게이트 그대로 열려있음, 차량 감지 상태 진입
+   - 예상 로그: `[XX.X cm] 출차 차량 감지`
+   - 실제: 게이트 유지
 
 3. **손 치우기** (차량 빠져나감)
-   - 예상: 게이트 닫힘
-   - MQTT: `parking/rpi2/event` = `{"event": "exit_completed", "timestamp": ...}`
+   - 예상 로그: `[XX.X cm] 차량 빠져나감 — 출차 완료, LED OFF, 부저 OFF, 게이트 닫음`
+   - 실제: 게이트 닫힘, LED 꺼짐
 
 ---
 
 ### 시나리오 3: 출차 타임아웃
 
-**물리 테스트:**
+**실제 RPI 물리 테스트:**
 1. **버튼 누르기** (GPIO 23)
-   - 예상: 게이트 열림
+   - 예상: 게이트 열림, LED 켜짐, 부저 울림
 
 2. **10초 동안 아무것도 하지 않기**
-   - 예상: 10초 후 자동으로 게이트 닫힘
+   - 예상 로그: `10초 경과 (차량 미감지) — LED OFF, 부저 OFF, 게이트 닫음 (타임아웃)`
+   - 실제: 10초 후 자동으로 게이트 닫힘, LED 꺼짐, 부저 꺼짐
 
 ---
 
@@ -306,8 +301,8 @@ mosquitto_sub -h 127.0.0.1 -t "#"
   MQTT 연결 성공
   구독: parking/rpi3/capacity
   ```
-- [ ] `mosquitto_sub` 에서 `parking/rpi2/#` 토픽 수신 확인
 - [ ] `[IDLE] 거리: XXX.X cm` 로그 3초마다 출력
+- [ ] 터미널 B(gate_node) 로그에서 상태 전환 메시지 확인
 - [ ] 만차 신호 MQTT 테스트:
   ```bash
   mosquitto_pub -h 127.0.0.1 -t "parking/rpi3/capacity" -m "FULL" -q 1 -r

@@ -24,8 +24,6 @@
 #define MQTT_KEEPALIVE  60
 
 #define TOPIC_SUB_CAPACITY   "parking/rpi3/capacity"
-#define TOPIC_PUB_GATE_STATE "parking/rpi2/gate"
-#define TOPIC_PUB_EVENT      "parking/rpi2/event"
 
 // 디바운싱 및 타이머
 #define DEBOUNCE_MS          300

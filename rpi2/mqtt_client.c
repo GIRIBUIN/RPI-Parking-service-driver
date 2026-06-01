@@ -86,39 +86,6 @@ void mqtt_connect(void) {
   }
 }
 
-void mqtt_publish_gate_state(const char *state) {
-  if (!mqtt_is_connected()) {
-    return;
-  }
-
-  int rc = mosquitto_publish(mosq, NULL, TOPIC_PUB_GATE_STATE,
-                             strlen(state), (void *)state, 1, true);
-  if (rc != MOSQ_ERR_SUCCESS)
-    printf("[MQTT 발행 실패] %s: %s\n", TOPIC_PUB_GATE_STATE, mosquitto_strerror(rc));
-  else
-    printf("[MQTT 발행] %s → %s\n", TOPIC_PUB_GATE_STATE, state);
-}
-
-void mqtt_publish_event(const char *event) {
-  if (!mqtt_is_connected()) {
-    return;
-  }
-
-  char payload[MAX_PAYLOAD];
-  time_t now = time(NULL);
-
-  snprintf(payload, sizeof(payload),
-          "{\"event\": \"%s\", \"timestamp\": %ld}",
-          event, (long)now);
-
-  int rc = mosquitto_publish(mosq, NULL, TOPIC_PUB_EVENT,
-                             strlen(payload), (void *)payload, 1, false);
-  if (rc != MOSQ_ERR_SUCCESS)
-    printf("[MQTT 발행 실패] %s: %s\n", TOPIC_PUB_EVENT, mosquitto_strerror(rc));
-  else
-    printf("[MQTT 발행] %s → %s\n", TOPIC_PUB_EVENT, payload);
-}
-
 int mqtt_is_connected(void) {
   pthread_mutex_lock(&mqtt_mutex);
   int connected = is_mqtt_connected;
