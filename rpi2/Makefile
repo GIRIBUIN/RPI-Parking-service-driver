@@ -1,7 +1,7 @@
 # ARM 크로스 컴파일 설정 (32-bit Raspberry Pi OS)
 ARCH          := arm
-CROSS_COMPILE := arm-linux-gnueabihf-
-RPI_KDIR      ?= $(HOME)/rpi-kernel-headers
+CROSS_COMPILE := arm-linux-gnueabi-
+RPI_KDIR      ?= $(HOME)/linux-rpi
 
 obj-m := gate_node.o
 gate_node-objs := gate_main.o gate_hw.o
