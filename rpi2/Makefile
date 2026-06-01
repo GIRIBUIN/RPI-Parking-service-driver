@@ -11,7 +11,7 @@ RPI2_USER = pi
 RPI2_IP   = 10.10.10.12
 RPI2_DIR  = ~/
 
-.PHONY: all clean scp
+.PHONY: all clean scp scp-src
 
 all: $(TARGET)
 
@@ -26,3 +26,6 @@ clean:
 
 scp:
 	scp $(TARGET) $(RPI2_USER)@$(RPI2_IP):$(RPI2_DIR)
+
+scp-src:
+	scp *.c *.h Makefile $(RPI2_USER)@$(RPI2_IP):$(RPI2_DIR)rpi2/
