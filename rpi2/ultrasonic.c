@@ -86,6 +86,7 @@ double ultrasonic_measure_cm(void) {
     long elapsed_us = (ts_now.tv_sec - ts_start.tv_sec) * 1000000LL
                     + (ts_now.tv_nsec - ts_start.tv_nsec) / 1000;
     if (elapsed_us > 30000) {
+      fprintf(stderr, "[WARN] 초음파 타임아웃: TRIG → ECHO HIGH 대기 초과\n");
       pthread_mutex_unlock(&ultrasonic_mutex);
       return -1.0;
     }
@@ -101,6 +102,7 @@ double ultrasonic_measure_cm(void) {
     long elapsed_us = (ts_now.tv_sec - ts_start.tv_sec) * 1000000LL
                     + (ts_now.tv_nsec - ts_start.tv_nsec) / 1000;
     if (elapsed_us > 30000) {
+      fprintf(stderr, "[WARN] 초음파 타임아웃: ECHO 펄스 폭 측정 초과\n");
       pthread_mutex_unlock(&ultrasonic_mutex);
       return -1.0;
     }

@@ -24,6 +24,7 @@ static int running = 1;
 static SystemState sys_state = STATE_IDLE;
 static time_t state_timer = 0;
 static pthread_mutex_t state_mutex = PTHREAD_MUTEX_INITIALIZER;
+static int idle_log_count = 0;  // IDLE 상태에서 3초마다 거리 출력용
 
 static void on_capacity(const char *status) {
   if (strcmp(status, "FULL") == 0) {
@@ -54,9 +55,11 @@ static void on_switch_press(void) {
     pthread_mutex_unlock(&state_mutex);
 
     gate_open();
+    entry_led_on();
+    buzzer_on();
     mqtt_publish_gate_state("OPEN");
     mqtt_publish_event("exit_requested");
-    printf("출차 요청 — 게이트 OPEN, 10초 타이머 시작\n");
+    printf("출차 요청 — 게이트 OPEN, LED ON, 부저 ON, 10초 타이머 시작\n");
   }
 }
 
@@ -104,6 +107,12 @@ int main(void) {
     // State Machine
     switch (s) {
     case STATE_IDLE:
+      // 3초마다 거리 출력 (센서 정상 작동 확인용)
+      if (++idle_log_count >= 30) {  // 100ms × 30 = 3초
+        printf("[IDLE] 거리: %.1f cm\n", dist);
+        idle_log_count = 0;
+      }
+
       if (dist > 0 && dist <= VEHICLE_DETECT_CM) {
         // 차량 감지 — 입차 시작
         pthread_mutex_lock(&state_mutex);
@@ -170,9 +179,11 @@ int main(void) {
         sys_state = STATE_IDLE;
         pthread_mutex_unlock(&state_mutex);
 
+        entry_led_off();
+        buzzer_off();
         gate_close();
         mqtt_publish_gate_state("CLOSED");
-        printf("10초 경과 (차량 미감지) — 게이트 닫음 (타임아웃)\n");
+        printf("10초 경과 (차량 미감지) — LED OFF, 부저 OFF, 게이트 닫음 (타임아웃)\n");
       }
       break;
 
@@ -183,10 +194,12 @@ int main(void) {
         sys_state = STATE_IDLE;
         pthread_mutex_unlock(&state_mutex);
 
+        entry_led_off();
+        buzzer_off();
         gate_close();
         mqtt_publish_gate_state("CLOSED");
         mqtt_publish_event("exit_completed");
-        printf("[%.1f cm] 차량 빠져나감 — 출차 완료, 게이트 닫음\n", dist);
+        printf("[%.1f cm] 차량 빠져나감 — 출차 완료, LED OFF, 부저 OFF, 게이트 닫음\n", dist);
       }
       break;
     }
