@@ -33,7 +33,7 @@ static struct task_struct *state_thread;
 static time64_t last_vehicle_detect = 0;
 static time64_t exit_request_time = 0;
 
-SystemState get_current_state(void) {
+SystemState gate_get_state(void) {
   SystemState state;
 
   mutex_lock(&state_mutex);
@@ -43,7 +43,7 @@ SystemState get_current_state(void) {
   return state;
 }
 
-void set_current_state(SystemState state) {
+void gate_set_state(SystemState state) {
   mutex_lock(&state_mutex);
   current_state = state;
   mutex_unlock(&state_mutex);
@@ -73,7 +73,7 @@ void set_capacity_full(int full) {
 }
 
 void on_switch_press(void) {
-  SystemState state = get_current_state();
+  SystemState state = gate_get_state();
 
   if (state == STATE_IDLE) {
     pr_info("[SWITCH] 출차 요청 — 게이트 OPEN, LED ON, 부저 ON, 10초 타이머 시작\n");
@@ -81,7 +81,7 @@ void on_switch_press(void) {
     entry_led_set(1);
     buzzer_on();
     exit_request_time = ktime_get_seconds();
-    set_current_state(STATE_EXIT_REQUESTED);
+    gate_set_state(STATE_EXIT_REQUESTED);
   }
 }
 
@@ -89,6 +89,7 @@ static int state_machine_thread_fn(void *data) {
   int distance_cm;
   time64_t now;
   int elapsed;
+  SystemState state;
 
   pr_info("State machine thread started\n");
 
@@ -98,7 +99,7 @@ static int state_machine_thread_fn(void *data) {
       on_switch_press();
     }
 
-    SystemState state = get_current_state();
+    state = gate_get_state();
 
     distance_cm = ultrasonic_measure_cm();
     now = ktime_get_seconds();
@@ -107,7 +108,7 @@ static int state_machine_thread_fn(void *data) {
     case STATE_IDLE:
       if (distance_cm > 0 && distance_cm <= VEHICLE_DETECT_CM) {
         pr_info("[%d cm] 입차 차량 감지 — 게이트 OPEN, LED ON, 부저 ON\n", distance_cm);
-        set_current_state(STATE_ENTRY_DETECTED);  // BUG-4: 상태 먼저 변경
+        gate_set_state(STATE_ENTRY_DETECTED);  // BUG-4: 상태 먼저 변경
         gate_open();
         entry_led_set(1);
         buzzer_on();
@@ -125,7 +126,7 @@ static int state_machine_thread_fn(void *data) {
         pr_info("[%d cm] 차량 사라짐 — 5초 타이머 시작\n", distance_cm);
         buzzer_off();
         last_vehicle_detect = now;
-        set_current_state(STATE_ENTRY_WAITING);
+        gate_set_state(STATE_ENTRY_WAITING);
       }
       break;
 
@@ -135,26 +136,26 @@ static int state_machine_thread_fn(void *data) {
         pr_info("5초 경과 — 게이트 닫음, LED OFF\n");
         gate_close();
         entry_led_set(0);
-        set_current_state(STATE_IDLE);
+        gate_set_state(STATE_IDLE);
       } else if (distance_cm > 0 && distance_cm <= VEHICLE_DETECT_CM) {
         pr_info("[%d cm] 재진입 감지 — 게이트 열림 상태 유지\n", distance_cm);
         buzzer_on();
         last_vehicle_detect = now;
-        set_current_state(STATE_ENTRY_DETECTED);
+        gate_set_state(STATE_ENTRY_DETECTED);
       }
       break;
 
     case STATE_EXIT_REQUESTED:
       if (distance_cm > 0 && distance_cm <= VEHICLE_DETECT_CM) {
         pr_info("[%d cm] 출차 차량 감지\n", distance_cm);
-        set_current_state(STATE_EXIT_VEHICLE_DETECTED);  // BUG-4: 상태 먼저 변경
+        gate_set_state(STATE_EXIT_VEHICLE_DETECTED);  // BUG-4: 상태 먼저 변경
         last_vehicle_detect = now;
       }
 
       elapsed = now - exit_request_time;
       if (elapsed >= EXIT_TIMEOUT_SEC) {
         pr_info("10초 경과 (차량 미감지) — LED OFF, 부저 OFF, 게이트 닫음 (타임아웃)\n");
-        set_current_state(STATE_IDLE);  // BUG-4: 상태 먼저 변경
+        gate_set_state(STATE_IDLE);  // BUG-4: 상태 먼저 변경
         gate_close();
         entry_led_set(0);
         buzzer_off();
@@ -170,7 +171,7 @@ static int state_machine_thread_fn(void *data) {
         gate_close();
         entry_led_set(0);
         buzzer_off();
-        set_current_state(STATE_IDLE);
+        gate_set_state(STATE_IDLE);
       }
 
       elapsed = now - exit_request_time;
@@ -179,7 +180,7 @@ static int state_machine_thread_fn(void *data) {
         gate_close();
         entry_led_set(0);
         buzzer_off();
-        set_current_state(STATE_IDLE);
+        gate_set_state(STATE_IDLE);
       }
       break;
     }

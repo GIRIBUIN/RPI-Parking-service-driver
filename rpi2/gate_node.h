@@ -33,8 +33,8 @@ int gate_hw_init(void);
 void gate_hw_cleanup(void);
 
 // 상태 머신 접근
-SystemState get_current_state(void);
-void set_current_state(SystemState state);
+SystemState gate_get_state(void);
+void gate_set_state(SystemState state);
 
 // 만차 플래그
 int get_capacity_full(void);
