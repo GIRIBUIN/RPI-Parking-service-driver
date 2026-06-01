@@ -27,5 +27,6 @@ captures/*
 # claude
 .claude/
 
-# rpi2 documentation (local development only)
+# rpi2 documentation (local development only) — .md 파일만 버전 관리
 rpi2/doc/
+!rpi2/doc/*.md
