@@ -2,7 +2,6 @@
 #define CONFIG_H
 
 // GPIO 핀 (BCM)
-#define SERVO_PIN            18
 #define ENTRY_LED_PIN        24
 #define SWITCH_PIN           23
 #define ULTRASONIC_TRIG_PIN  17
@@ -10,17 +9,16 @@
 #define BUZZER_PIN           22
 #define FULL_LED_PIN         25
 
-// 서보 PWM (나노초 단위)
-// 50Hz = 20ms = 20000000ns 주기
-// OPEN (0도):   0.5ms = 500000ns
-// CLOSED(180도): 2.4ms = 2400000ns
-#define PWM_PERIOD_NS        20000000
-#define PWM_DUTY_OPEN_NS     500000
-#define PWM_DUTY_CLOSED_NS   2400000
-#define SERVO_DELAY_MS       500
+// 스테퍼 모터 (28BYJ-48 + ULN2003)
+#define STEPPER_IN1          5    // GPIO 5 (핀 29)
+#define STEPPER_IN2          6    // GPIO 6 (핀 31)
+#define STEPPER_IN3          13   // GPIO 13 (핀 33)
+#define STEPPER_IN4          19   // GPIO 19 (핀 35)
+#define STEPPER_STEP_DELAY_US 2000  // 스텝 간격 2ms
+#define STEPPER_GATE_STEPS   1024  // 90도 회전 (4096 = 360도)
 
 // MQTT
-#define MQTT_HOST       "192.168.1.100"
+#define MQTT_HOST       "127.0.0.1"
 #define MQTT_PORT       1883
 #define MQTT_CLIENT_ID  "rpi2_gate"
 #define MQTT_KEEPALIVE  60

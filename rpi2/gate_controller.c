@@ -8,10 +8,21 @@
 #include "gate_controller.h"
 
 #define GPIO_PATH "/sys/class/gpio"
-#define PWM_PATH "/sys/class/pwm/pwmchip0"
 
-static GateState current_state = GATE_OPEN;
+static GateState current_state = GATE_CLOSED;
 static pthread_mutex_t gate_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+// 하프스텝 시퀀스 (8단계)
+static const int stepper_sequence[8][4] = {
+  {1, 0, 0, 0},  // 0
+  {1, 1, 0, 0},  // 1
+  {0, 1, 0, 0},  // 2
+  {0, 1, 1, 0},  // 3
+  {0, 0, 1, 0},  // 4
+  {0, 0, 1, 1},  // 5
+  {0, 0, 0, 1},  // 6
+  {1, 0, 0, 1}   // 7
+};
 
 // GPIO export/unexport
 static int export_gpio(int pin) {
@@ -67,64 +78,49 @@ static int set_gpio_value(int pin, int value) {
   return 0;
 }
 
-// PWM 설정
-static int setup_pwm(void) {
-  char path[256];
-  int fd;
-
-  // PWM0 export
-  snprintf(path, sizeof(path), "%s/export", PWM_PATH);
-  fd = open(path, O_WRONLY);
-  if (fd >= 0) {
-    write(fd, "0", 1);
-    close(fd);
-    usleep(100000);
-  }
-
-  // PWM period 설정 (50Hz = 20ms = 20000000ns)
-  snprintf(path, sizeof(path), "%s/pwm0/period", PWM_PATH);
-  fd = open(path, O_WRONLY);
-  if (fd < 0) {
-    perror("PWM period 설정 실패");
-    return -1;
-  }
-  dprintf(fd, "20000000");
-  close(fd);
-
-  // PWM duty cycle 초기값 (OPEN)
-  snprintf(path, sizeof(path), "%s/pwm0/duty_cycle", PWM_PATH);
-  fd = open(path, O_WRONLY);
-  if (fd < 0) {
-    perror("PWM duty_cycle 설정 실패");
-    return -1;
-  }
-  dprintf(fd, "%d", PWM_DUTY_OPEN_NS);
-  close(fd);
-
-  // PWM 활성화
-  snprintf(path, sizeof(path), "%s/pwm0/enable", PWM_PATH);
-  fd = open(path, O_WRONLY);
-  if (fd >= 0) {
-    write(fd, "1", 1);
-    close(fd);
-  }
-
-  return 0;
+// 스테퍼 모터 핀 설정
+static void stepper_set_pins(int a, int b, int c, int d) {
+  set_gpio_value(STEPPER_IN1, a);
+  set_gpio_value(STEPPER_IN2, b);
+  set_gpio_value(STEPPER_IN3, c);
+  set_gpio_value(STEPPER_IN4, d);
 }
 
-static int set_pwm_duty(int duty_ns) {
-  char path[256];
-  snprintf(path, sizeof(path), "%s/pwm0/duty_cycle", PWM_PATH);
-  int fd = open(path, O_WRONLY);
-  if (fd < 0) {
-    return -1;
+// 스테퍼 모터 이동 (양수: 정방향, 음수: 역방향)
+static void stepper_move(int steps) {
+  int direction = (steps > 0) ? 1 : -1;
+  int abs_steps = (steps > 0) ? steps : -steps;
+  static int current_step = 0;
+
+  for (int i = 0; i < abs_steps; i++) {
+    current_step = (current_step + direction + 8) % 8;
+    stepper_set_pins(stepper_sequence[current_step][0],
+                     stepper_sequence[current_step][1],
+                     stepper_sequence[current_step][2],
+                     stepper_sequence[current_step][3]);
+    usleep(STEPPER_STEP_DELAY_US);
   }
-  dprintf(fd, "%d", duty_ns);
-  close(fd);
-  return 0;
+}
+
+// 스테퍼 모터 전원 차단 (발열 방지)
+static void stepper_deenergize(void) {
+  stepper_set_pins(0, 0, 0, 0);
 }
 
 void gate_controller_init(void) {
+  // 스테퍼 모터 핀 export 및 설정
+  export_gpio(STEPPER_IN1);
+  export_gpio(STEPPER_IN2);
+  export_gpio(STEPPER_IN3);
+  export_gpio(STEPPER_IN4);
+
+  set_gpio_direction(STEPPER_IN1, "out");
+  set_gpio_direction(STEPPER_IN2, "out");
+  set_gpio_direction(STEPPER_IN3, "out");
+  set_gpio_direction(STEPPER_IN4, "out");
+
+  stepper_set_pins(0, 0, 0, 0);
+
   // 입차 LED GPIO export 및 설정
   export_gpio(ENTRY_LED_PIN);
   set_gpio_direction(ENTRY_LED_PIN, "out");
@@ -135,10 +131,10 @@ void gate_controller_init(void) {
   set_gpio_direction(FULL_LED_PIN, "out");
   set_gpio_value(FULL_LED_PIN, 0);
 
-  // 서보 PWM 설정
-  setup_pwm();
-
-  current_state = GATE_OPEN;
+  // 초기 상태: CLOSED
+  stepper_move(-STEPPER_GATE_STEPS);
+  stepper_deenergize();
+  current_state = GATE_CLOSED;
 }
 
 void gate_open(void) {
@@ -149,13 +145,8 @@ void gate_open(void) {
     return;
   }
 
-  // PWM duty cycle 설정 (0.5ms)
-  set_pwm_duty(PWM_DUTY_OPEN_NS);
-  usleep(SERVO_DELAY_MS * 1000);
-
-  // PWM 신호 차단 (duty_cycle = 0)
-  set_pwm_duty(0);
-
+  stepper_move(STEPPER_GATE_STEPS);
+  stepper_deenergize();
   current_state = GATE_OPEN;
 
   pthread_mutex_unlock(&gate_mutex);
@@ -169,13 +160,8 @@ void gate_close(void) {
     return;
   }
 
-  // PWM duty cycle 설정 (2.4ms)
-  set_pwm_duty(PWM_DUTY_CLOSED_NS);
-  usleep(SERVO_DELAY_MS * 1000);
-
-  // PWM 신호 차단 (duty_cycle = 0)
-  set_pwm_duty(0);
-
+  stepper_move(-STEPPER_GATE_STEPS);
+  stepper_deenergize();
   current_state = GATE_CLOSED;
 
   pthread_mutex_unlock(&gate_mutex);
@@ -198,24 +184,15 @@ void full_led_off(void) {
 }
 
 void gate_controller_cleanup(void) {
-  // PWM 비활성화
-  char path[256];
-  snprintf(path, sizeof(path), "%s/pwm0/enable", PWM_PATH);
-  int fd = open(path, O_WRONLY);
-  if (fd >= 0) {
-    write(fd, "0", 1);
-    close(fd);
-  }
+  // 스테퍼 모터 전원 차단
+  stepper_deenergize();
 
-  // PWM0 unexport
-  snprintf(path, sizeof(path), "%s/unexport", PWM_PATH);
-  fd = open(path, O_WRONLY);
-  if (fd >= 0) {
-    write(fd, "0", 1);
-    close(fd);
-  }
+  // GPIO unexport
+  unexport_gpio(STEPPER_IN1);
+  unexport_gpio(STEPPER_IN2);
+  unexport_gpio(STEPPER_IN3);
+  unexport_gpio(STEPPER_IN4);
 
-  // LED GPIO unexport
   entry_led_off();
   full_led_off();
   unexport_gpio(ENTRY_LED_PIN);
