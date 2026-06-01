@@ -145,14 +145,13 @@ int main(void) {
 
     case STATE_ENTRY_WAITING:
       if (dist > 0 && dist <= VEHICLE_DETECT_CM) {
-        // 차량 재감지 — 입차 상태로 복귀
+        // 차량 재감지 — 입차 상태로 복귀 (부저는 최초 감지 기준 6초 유지)
         pthread_mutex_lock(&state_mutex);
         sys_state = STATE_ENTRY_DETECTED;
         state_timer = now;
-        buzzer_ticks = 60;
         pthread_mutex_unlock(&state_mutex);
 
-        printf("[%.1f cm] 차량 재감지 — 입차 상태 복귀, 부저 재시작\n", dist);
+        printf("[%.1f cm] 차량 재감지 — 입차 상태 복귀\n", dist);
       } else if (now - state_timer >= ENTRY_CLOSE_DELAY_SEC) {
         // 5초 경과 — 게이트 닫음
         pthread_mutex_lock(&state_mutex);
