@@ -190,13 +190,17 @@ static int state_machine_thread_fn(void *data) {
     }
 
     // 부저 패턴 처리 (상태에 따라 0.5초 on/off 반복 또는 OFF)
+    // LED도 동시에 깜빡임 (완벽한 동기화)
     state = gate_get_state();
     if (state != STATE_IDLE) {
       buzzer_phase = (buzzer_phase + 1) % 10;
-      if (buzzer_phase < 5)
+      if (buzzer_phase < 5) {
         buzzer_on();
-      else
+        entry_led_set(1);
+      } else {
         buzzer_off();
+        entry_led_set(0);
+      }
     } else {
       buzzer_phase = 0;
       buzzer_off();

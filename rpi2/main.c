@@ -211,8 +211,10 @@ int main(void) {
       buzzer_phase = (buzzer_phase + 1) % 10;
       if (buzzer_phase < 5) {
         buzzer_on();
+        entry_led_on();
       } else {
         buzzer_off();
+        entry_led_off();
       }
     } else {
       buzzer_phase = 0;
