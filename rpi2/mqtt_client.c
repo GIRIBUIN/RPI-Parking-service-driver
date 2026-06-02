@@ -93,6 +93,47 @@ int mqtt_is_connected(void) {
   return connected;
 }
 
+// [검토] RPI2 게이트 상태 publish 위치. Dashboard는 이 topic으로 OPEN/CLOSED를 표시한다.
+int mqtt_publish_gate_state(const char *state) {
+  if (!mosq || !mqtt_is_connected()) {
+    printf("MQTT 미연결 — 게이트 상태 발행 생략: %s\n", state);
+    return -1;
+  }
+
+  int rc = mosquitto_publish(mosq, NULL, TOPIC_PUB_GATE,
+                             (int)strlen(state), state, 1, true);
+  if (rc != MOSQ_ERR_SUCCESS) {
+    printf("게이트 상태 발행 실패: %s\n", mosquitto_strerror(rc));
+    return -1;
+  }
+
+  printf("발행: %s => %s\n", TOPIC_PUB_GATE, state);
+  return 0;
+}
+
+// [검토] RPI2 게이트 이벤트 publish 위치. event는 ENTRY_OPEN 또는 EXIT_OPEN만 사용한다.
+int mqtt_publish_gate_event(const char *event, const char *reason) {
+  char payload[MAX_PAYLOAD];
+
+  if (!mosq || !mqtt_is_connected()) {
+    printf("MQTT 미연결 — 게이트 이벤트 발행 생략: %s\n", event);
+    return -1;
+  }
+
+  snprintf(payload, sizeof(payload),
+           "{\"event\":\"%s\",\"reason\":\"%s\"}", event, reason);
+
+  int rc = mosquitto_publish(mosq, NULL, TOPIC_PUB_EVENT,
+                             (int)strlen(payload), payload, 1, false);
+  if (rc != MOSQ_ERR_SUCCESS) {
+    printf("게이트 이벤트 발행 실패: %s\n", mosquitto_strerror(rc));
+    return -1;
+  }
+
+  printf("발행: %s => %s\n", TOPIC_PUB_EVENT, payload);
+  return 0;
+}
+
 void mqtt_client_cleanup(void) {
   if (mosq) {
     mosquitto_loop_stop(mosq, true);

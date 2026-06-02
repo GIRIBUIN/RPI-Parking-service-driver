@@ -56,6 +56,8 @@ static void on_switch_press(void) {
     pthread_mutex_unlock(&state_mutex);
 
     gate_open();
+    mqtt_publish_gate_event("EXIT_OPEN", "switch_pressed");  // [검토] 출차 버튼으로 게이트 open 이벤트 발행
+    mqtt_publish_gate_state("OPEN");                         // [검토] 출차 요청 후 게이트 OPEN 상태 발행
     printf("출차 요청 — 게이트 OPEN, 10초 타이머 시작\n");
   }
 }
@@ -87,6 +89,7 @@ int main(void) {
 
   // 초기 상태: 게이트 닫힘
   gate_close();
+  mqtt_publish_gate_state("CLOSED");  // [검토] 초기 게이트 CLOSED 상태 발행
   entry_led_off();
   buzzer_off();
   printf("게이트 초기 상태: CLOSED\n");
@@ -117,6 +120,8 @@ int main(void) {
         pthread_mutex_unlock(&state_mutex);
 
         gate_open();
+        mqtt_publish_gate_event("ENTRY_OPEN", "vehicle_detected");  // [검토] 입구 초음파 감지로 게이트 open 이벤트 발행
+        mqtt_publish_gate_state("OPEN");                            // [검토] 입차 감지 후 게이트 OPEN 상태 발행
         printf("[%.1f cm] 입차 차량 감지 — 게이트 OPEN\n", dist);
       }
       break;
@@ -149,6 +154,7 @@ int main(void) {
         pthread_mutex_unlock(&state_mutex);
 
         gate_close();
+        mqtt_publish_gate_state("CLOSED");  // [검토] 입차 timer 만료 후 게이트 CLOSED 상태 발행
         printf("5초 경과 — 게이트 닫음\n");
       }
       break;
@@ -168,6 +174,7 @@ int main(void) {
         pthread_mutex_unlock(&state_mutex);
 
         gate_close();
+        mqtt_publish_gate_state("CLOSED");  // [검토] 출차 요청 timeout 후 게이트 CLOSED 상태 발행
         printf("10초 경과 (차량 미감지) — 게이트 닫음 (타임아웃)\n");
       }
       break;
@@ -180,6 +187,7 @@ int main(void) {
         pthread_mutex_unlock(&state_mutex);
 
         gate_close();
+        mqtt_publish_gate_state("CLOSED");  // [검토] 출차 완료 후 게이트 CLOSED 상태 발행
         printf("[%.1f cm] 차량 빠져나감 — 출차 완료, 게이트 닫음\n", dist);
       }
       break;
