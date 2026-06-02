@@ -48,19 +48,19 @@ static void set_gpio_value(int pin, int value) {
 void buzzer_init(void) {
   export_gpio(BUZZER_PIN);
   set_gpio_direction(BUZZER_PIN, "out");
-  set_gpio_value(BUZZER_PIN, 0);
+  set_gpio_value(BUZZER_PIN, 1);
   printf("부저 초기화 완료\n");
 }
 
 void buzzer_on(void) {
   pthread_mutex_lock(&buzzer_mutex);
-  set_gpio_value(BUZZER_PIN, 1);
+  set_gpio_value(BUZZER_PIN, 0);
   pthread_mutex_unlock(&buzzer_mutex);
 }
 
 void buzzer_off(void) {
   pthread_mutex_lock(&buzzer_mutex);
-  set_gpio_value(BUZZER_PIN, 0);
+  set_gpio_value(BUZZER_PIN, 1);
   pthread_mutex_unlock(&buzzer_mutex);
 }
 

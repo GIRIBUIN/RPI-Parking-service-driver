@@ -95,7 +95,7 @@ void buzzer_on(void) {
   unsigned long flags;
 
   spin_lock_irqsave(&hw_lock, flags);
-  gpio_set_value(BUZZER_PIN, 1);
+  gpio_set_value(BUZZER_PIN, 0);
   spin_unlock_irqrestore(&hw_lock, flags);
 }
 
@@ -103,7 +103,7 @@ void buzzer_off(void) {
   unsigned long flags;
 
   spin_lock_irqsave(&hw_lock, flags);
-  gpio_set_value(BUZZER_PIN, 0);
+  gpio_set_value(BUZZER_PIN, 1);
   spin_unlock_irqrestore(&hw_lock, flags);
 }
 
@@ -231,6 +231,9 @@ int gate_hw_init(void) {
     }
   }
 
+  // 부저만 Active Low이므로 초기값 1(OFF)로 설정
+  gpio_set_value(BUZZER_PIN, 1);
+
   // 입력 GPIO 설정
   ret = gpio_direction_input(ULTRASONIC_ECHO_PIN);
   if (ret) {
@@ -275,8 +278,8 @@ void gate_hw_cleanup(void) {
   }
 
   // BCM GPIO는 gpio_free() 이후에도 마지막 핀 상태를 유지함
-  // gpio_free 전에 모든 출력 핀을 LOW로 내려야 함 (특히 부저)
-  gpio_set_value(BUZZER_PIN, 0);
+  // gpio_free 전에 모든 출력 핀을 정리해야 함 (부저는 Active Low이므로 1)
+  gpio_set_value(BUZZER_PIN, 1);
   gpio_set_value(ENTRY_LED_PIN, 0);
   gpio_set_value(FULL_LED_PIN, 0);
   gpio_set_value(STEPPER_IN1, 0);
