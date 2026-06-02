@@ -79,8 +79,7 @@ void on_switch_press(void) {
   SystemState state = gate_get_state();
 
   if (state == STATE_IDLE) {
-    pr_info("[SWITCH] 출차 요청 — LED ON, 게이트 OPEN, 10초 타이머 시작\n");
-    entry_led_set(1);
+    pr_info("[SWITCH] 출차 요청 — 게이트 OPEN, 10초 타이머 시작\n");
     gate_open();
     exit_request_time = ktime_get_seconds();
     gate_set_state(STATE_EXIT_REQUESTED);
@@ -109,9 +108,8 @@ static int state_machine_thread_fn(void *data) {
     switch (state) {
     case STATE_IDLE:
       if (distance_cm > 0 && distance_cm <= VEHICLE_DETECT_CM) {
-        pr_info("[%d cm] 입차 차량 감지 — LED ON, 게이트 OPEN\n", distance_cm);
+        pr_info("[%d cm] 입차 차량 감지 — 게이트 OPEN\n", distance_cm);
         gate_set_state(STATE_ENTRY_DETECTED);  // BUG-4: 상태 먼저 변경
-        entry_led_set(1);
         gate_open();
         last_vehicle_detect = now;
       } else if (distance_cm > 0) {
@@ -133,11 +131,8 @@ static int state_machine_thread_fn(void *data) {
     case STATE_ENTRY_WAITING:
       elapsed = now - last_vehicle_detect;
       if (elapsed >= ENTRY_CLOSE_DELAY_SEC) {
-        pr_info("5초 경과 — 게이트 닫음, LED OFF\n");
+        pr_info("5초 경과 — 게이트 닫음\n");
         gate_close();
-        entry_led_set(0);
-        buzzer_phase = 0;
-        buzzer_off();
         gate_set_state(STATE_IDLE);
       } else if (distance_cm > 0 && distance_cm <= VEHICLE_DETECT_CM) {
         pr_info("[%d cm] 재진입 감지 — 게이트 열림 상태 유지\n", distance_cm);
@@ -154,12 +149,9 @@ static int state_machine_thread_fn(void *data) {
       } else {
         elapsed = now - exit_request_time;
         if (elapsed >= EXIT_TIMEOUT_SEC) {
-          pr_info("10초 경과 (차량 미감지) — LED OFF, 게이트 닫음 (타임아웃)\n");
-          gate_set_state(STATE_IDLE);  // BUG-4: 상태 먼저 변경
+          pr_info("10초 경과 (차량 미감지) — 게이트 닫음 (타임아웃)\n");
           gate_close();
-          entry_led_set(0);
-          buzzer_phase = 0;
-          buzzer_off();
+          gate_set_state(STATE_IDLE);  // BUG-4: 상태 먼저 변경
         }
       }
       break;
@@ -169,21 +161,15 @@ static int state_machine_thread_fn(void *data) {
         pr_debug("[EXIT] 거리: %d cm\n", distance_cm);
         last_vehicle_detect = now;
       } else if (distance_cm > VEHICLE_DETECT_CM) {
-        pr_info("[%d cm] 차량 빠져나감 — 출차 완료, LED OFF, 게이트 닫음\n", distance_cm);
+        pr_info("[%d cm] 차량 빠져나감 — 출차 완료, 게이트 닫음\n", distance_cm);
         gate_close();
-        entry_led_set(0);
-        buzzer_phase = 0;
-        buzzer_off();
         gate_set_state(STATE_IDLE);
       }
 
       elapsed = now - exit_request_time;
       if (elapsed >= EXIT_TIMEOUT_SEC) {
-        pr_info("10초 경과 (차량 미감지) — LED OFF, 게이트 닫음 (타임아웃)\n");
+        pr_info("10초 경과 (차량 미감지) — 게이트 닫음 (타임아웃)\n");
         gate_close();
-        entry_led_set(0);
-        buzzer_phase = 0;
-        buzzer_off();
         gate_set_state(STATE_IDLE);
       }
       break;
@@ -204,6 +190,7 @@ static int state_machine_thread_fn(void *data) {
     } else {
       buzzer_phase = 0;
       buzzer_off();
+      entry_led_set(0);
     }
 
     msleep(100);  // 100ms 주기로 상태 체크
