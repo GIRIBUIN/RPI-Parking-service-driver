@@ -203,6 +203,11 @@ int switch_was_pressed(void) {
 int gate_hw_init(void) {
   int ret;
   int i;
+  int out_pins[] = {
+    STEPPER_IN1, STEPPER_IN2, STEPPER_IN3, STEPPER_IN4,
+    ENTRY_LED_PIN, BUZZER_PIN, FULL_LED_PIN,
+    ULTRASONIC_TRIG_PIN
+  };
 
   spin_lock_init(&hw_lock);
 
@@ -217,11 +222,6 @@ int gate_hw_init(void) {
   }
 
   // 출력 GPIO 설정
-  int out_pins[] = {
-    STEPPER_IN1, STEPPER_IN2, STEPPER_IN3, STEPPER_IN4,
-    ENTRY_LED_PIN, BUZZER_PIN, FULL_LED_PIN,
-    ULTRASONIC_TRIG_PIN
-  };
 
   for (i = 0; i < ARRAY_SIZE(out_pins); i++) {
     ret = gpio_direction_output(out_pins[i], 0);
