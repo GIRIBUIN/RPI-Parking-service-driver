@@ -1,94 +1,133 @@
 # MQTT Topics
 
-This document defines the MQTT topic structure for the smart parking system.
+스마트 주차장 시스템의 MQTT 토픽 구조를 정의한다.
 
 ```text
 parking/
 ├── rpi1/
-│   ├── status
+│   ├── slot
 │   ├── distance
-│   ├── risk
-│   └── event
-│
-├── rpi2/
-│   ├── gate
-│   └── event
-│
-└── control/
-    └── gate
+│   └── lot
+└── rpi2/
+    ├── gate
+    └── event
 ```
 
 ---
 
-# Topic Ownership
+## Topic Ownership
 
-| Topic | Publisher | Subscriber | Description |
+| Topic | Publisher | Subscriber | 용도 |
 |---|---|---|---|
-| parking/rpi1/status | RPI1 | RPI3 | Parking state: EMPTY, APPROACHING, PARKING, PARKED |
-| parking/rpi1/distance | RPI1 | RPI3 | Ultrasonic sensor distance values |
-| parking/rpi1/risk | RPI1 | RPI3 | Risk state: SAFE, WARNING, DANGER |
-| parking/rpi1/event | RPI1 | RPI3 | Parking-related events |
-| parking/rpi2/gate | RPI2 | RPI3 | Current gate state: OPEN, CLOSED |
-| parking/rpi2/event | RPI2 | RPI3 | Gate and exit request events |
-| parking/control/gate | RPI1 | RPI2 | Gate control command: OPEN, CLOSE |
+| `parking/rpi1/slot` | RPI1 | RPI3 | Slot 1, Slot 2 점유 상태 |
+| `parking/rpi1/distance` | RPI1 | RPI3 | Slot 1, Slot 2 초음파 거리값 |
+| `parking/rpi1/lot` | RPI1 | RPI2, RPI3 | 전체 주차장 상태 |
+| `parking/rpi2/gate` | RPI2 | RPI3 | 현재 게이트 상태 |
+| `parking/rpi2/event` | RPI2 | RPI3 | 진입, 출차, 자동 닫힘 이벤트 |
 
 ---
 
-# Event Policy
+## State Values
 
-- RPI1 publishes parking states and sensor/risk data.
-- When RPI1 detects `PARKED`, it publishes `CLOSE` to `parking/control/gate`.
-- RPI2 subscribes to `parking/control/gate` and controls the servo motor.
-- RPI2 publishes the current gate state to `parking/rpi2/gate`.
-- RPI2 publishes button and gate events to `parking/rpi2/event`.
-- RPI3 only monitors and stores system data. It does not directly control the gate.
+### Slot
+
+| State | Description |
+|---|---|
+| `EMPTY` | 차량 없음 |
+| `OCCUPIED` | 차량 주차 완료, 슬롯 점유 |
+
+### Parking Lot
+
+| State | Description |
+|---|---|
+| `AVAILABLE` | 빈 슬롯 있음 |
+| `FULL` | 모든 슬롯 점유 |
+
+### Gate
+
+| State | Description |
+|---|---|
+| `OPEN` | 게이트 열림 |
+| `CLOSED` | 게이트 닫힘 |
+
+### Gate Event
+
+| Event | Reason | Description |
+|---|---|---|
+| `ENTRY_OPEN` | `vehicle_detected` | 입구 차량 접근 감지로 게이트 open |
+| `EXIT_OPEN` | `switch_pressed` | 출차 버튼 입력으로 게이트 open |
+| `AUTO_CLOSE` | `timer_expired` | timer 만료로 게이트 close |
 
 ---
 
-# Example Messages
+## Event Policy
 
-## parking/rpi1/status
+- RPI1은 슬롯 초음파 센서 2개를 순차 측정한다.
+- RPI1은 슬롯별 거리값과 `EMPTY`/`OCCUPIED` 상태를 판단해 발행한다.
+- RPI1은 Slot 1, Slot 2가 모두 `OCCUPIED`이면 `FULL`, 하나라도 비어 있으면 `AVAILABLE`을 발행한다.
+- RPI2는 `parking/rpi1/lot`을 구독해 만차 LED 표시 여부를 결정한다.
+- RPI2는 입구 초음파 센서로 차량 접근을 감지하면 게이트를 `OPEN`하고 `ENTRY_OPEN` 이벤트를 발행한다.
+- RPI2는 출차 스위치 입력을 감지하면 게이트를 `OPEN`하고 `EXIT_OPEN` 이벤트를 발행한다.
+- RPI2는 게이트 open 후 timer가 만료되면 `CLOSED`로 전환하고 `AUTO_CLOSE` 이벤트를 발행한다.
+- RPI2는 차량 접근이 새로 감지되면 close timer를 갱신한다.
+- RPI3는 RPI1/RPI2의 상태와 이벤트를 구독해 DB와 Dashboard에 반영한다.
 
-```text
-PARKED
-```
+---
 
-## parking/rpi1/distance
+## Example Messages
+
+### `parking/rpi1/slot`
 
 ```json
 {
-  "front": 18.2,
-  "rear": 7.5,
-  "side": 12.0
+  "slot1": "OCCUPIED",
+  "slot2": "EMPTY"
 }
 ```
 
-## parking/rpi1/risk
+### `parking/rpi1/distance`
 
-```text
-WARNING
+```json
+{
+  "slot1": 12,
+  "slot2": 48,
+  "unit": "cm"
+}
 ```
 
-## parking/rpi1/event
+### `parking/rpi1/lot`
 
 ```text
-parking_completed
+AVAILABLE
+FULL
 ```
 
-## parking/control/gate
+### `parking/rpi2/gate`
 
 ```text
-CLOSE
-```
-
-## parking/rpi2/gate
-
-```text
+OPEN
 CLOSED
 ```
 
-## parking/rpi2/event
+### `parking/rpi2/event`
 
-```text
-exit_requested
+```json
+{
+  "event": "ENTRY_OPEN",
+  "reason": "vehicle_detected"
+}
+```
+
+```json
+{
+  "event": "EXIT_OPEN",
+  "reason": "switch_pressed"
+}
+```
+
+```json
+{
+  "event": "AUTO_CLOSE",
+  "reason": "timer_expired"
+}
 ```

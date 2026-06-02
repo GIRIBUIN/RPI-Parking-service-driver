@@ -1,166 +1,263 @@
-# Digital Twin Smart Parking System
+# 주차장 점유 상태 모니터링
 
-IoT/CPS 기반 스마트 주차 공간 모니터링 시스템.
+초음파 센서를 통해 주차 슬롯의 점유 상태를 판단하고, 주차장 입구 바리게이트를 제어하며, 중앙 서버에서 MQTT/DB/Dashboard를 통해 전체 상태를 모니터링하는 IoT 기반 스마트 주차장 시스템이다.
 
-실제 주차 공간 상태를 초음파 센서를 통해 측정하고,
-Digital Twin Dashboard에 실시간으로 반영하는 스마트 주차 시스템이다.
-
-차량 접근 및 주차 상태를 감지하고,
-LED/Buzzer를 통해 위험 상태를 경고하며,
-Servo Motor를 이용해 바리게이트를 제어한다.
-
-센서 데이터와 상태 정보는 MQTT를 통해 중앙 서버(Rpi #3)로 전송되며,
-Dashboard에서 실시간 상태를 모니터링할 수 있다.
+주차장은 입구 바리게이트 1개와 내부 주차 슬롯 2개로 구성한다. 슬롯이 모두 점유된 경우에는 만차 상태를 LED와 Dashboard로 안내하고, 차량은 내부 회차 공간을 통해 출구 방향으로 이동한다.
 
 ---
 
-# Project Goal
+## 프로젝트 목표
 
-- 차량 접근 및 주차 상태 실시간 감지
-- 후방/측면 충돌 위험 경고
-- 게이트 자동 제어
-- 현실 공간과 Digital Twin 동기화
-- 실시간 상태 모니터링 제공
+### 감지
+- Slot 1, Slot 2의 점유 상태 감지
+- 초음파 센서 거리값 기반으로 `EMPTY`, `OCCUPIED` 판단
 
----
+### 경고
+- 주차 슬롯 만차 상태를 LED로 알림
+- 출차 이벤트 상태를 LED/Buzzer로 알림
 
-# System Architecture
+### 제어
+- 주차장 입구 바리게이트 제어
+- 입구 초음파 센서가 차량 접근을 감지하면 바리게이트 open
+- 일정 시간이 지나면 바리게이트 close
+- 물체가 새로 접근하면 close timer 갱신
+- 출차 시에는 스위치 입력으로 바리게이트 open 후 일정 시간 뒤 close
 
-Rpi #1
-- 주차 공간 센싱 + 상태 판단 + 경고
-
-Rpi #2
-- 바리게이트 제어 + 출차 버튼 처리
-
-Rpi #3
-- MQTT Broker + DB + Dashboard Monitoring
-
----
-
-# Scenario
-
-1. 차량이 주차 공간 입구에 접근
-2. 초음파 센서를 통해 거리 측정
-3. 위험 상태를 LED/Buzzer로 표시
-4. 차량이 주차 완료 상태가 되면 게이트 닫힘
-5. Dashboard(Digital Twin)에 상태 실시간 반영
-6. 사용자가 출차 버튼(Switch) 입력
-7. 게이트 열림
-8. 차량 이탈 확인 후 EMPTY 상태 복귀
+### 모니터링
+- Slot 1, Slot 2 점유 상태 표시
+- 전체 주차장 상태 표시
+- 바리게이트 상태 표시
+- 최근 이벤트 로그 표시
 
 ---
 
-# Hardware Components
+## 시스템 구조
 
-## Rpi #1
-- Ultrasonic Sensor x3
-- LED x1
-- Buzzer x1
+### Rpi #1
 
-## Rpi #2
-- Servo Motor x1
-- Switch x1
-- LED x1
-
-## Rpi #3
-- MQTT Broker
-- SQLite DB
-- Web Dashboard
-
----
-
-# Ultrasonic Sensor Roles
-
-## Ultrasonic #1
-주차 공간 정면(입구)
+담당: 주차 점유 판단
 
 역할:
-- 차량 접근 감지
+- 슬롯별 초음파 센싱
+- 슬롯 점유 상태 판단
+- 전체 주차장 상태 판단
+- 슬롯별 LED 제어
+- MQTT로 슬롯 상태, 거리값, 전체 주차장 상태 발행
 
-## Ultrasonic #2
-주차 공간 후면
+센서/액추에이터:
+- Ultrasonic #1: Slot 1 점유 센싱
+- Ultrasonic #2: Slot 2 점유 센싱
+- Slot 1 LED: `EMPTY` 소등, `OCCUPIED` 점등
+- Slot 2 LED: `EMPTY` 소등, `OCCUPIED` 점등
+
+### Rpi #2
+
+담당: 바리게이트 제어
 
 역할:
-- 주차 완료 판단
-- 후방 충돌 위험 감지
+- 입구 차량 접근 감지
+- 주차장 만차 상태 수신
+- 게이트 open/close 제어
+- 출차 요청 스위치 이벤트 처리
+- LED/Buzzer로 만차 및 출차 이벤트 표시
+- MQTT로 게이트 상태와 이벤트 발행
 
-## Ultrasonic #3
-주차 공간 측면(우측)
+센서/액추에이터:
+- Ultrasonic #3: 주차장 입구 차량 접근 감지
+- Switch: 출차 요청 버튼
+- Servo Motor: 게이트 open/close
+- LED: 만차 이벤트 상태 표시
+- LED/Buzzer: 출차 이벤트 상태 표시
+
+### Rpi #3
+
+담당: 중앙 서버
 
 역할:
-- 측면 충돌 위험 감지
+- MQTT Broker 실행
+- RPI1/RPI2 메시지 수신
+- 슬롯 점유 상태 저장
+- 게이트 상태 저장
+- 이벤트 로그 저장
+- Dashboard에 주차장 상태 표시
+
+Dashboard 표시 항목:
+- Slot 1 상태
+- Slot 2 상태
+- Parking Lot 상태: `AVAILABLE` / `FULL`
+- Gate 상태: `OPEN` / `CLOSED`
+- 최근 이벤트 로그
 
 ---
 
-# Warning State
+## 상태 정의
 
-## SAFE
-- LED: 소등
-- Buzzer: 무음
-
-## WARNING
-- LED: 깜빡임
-- Buzzer: 간헐적 beep
-
-## DANGER
-- LED: 점등 유지
-- Buzzer: 연속 경고음
-
----
-
-# Parking State
+### Slot
 
 | State | Description |
 |---|---|
 | EMPTY | 차량 없음 |
-| APPROACHING | 차량 접근 중 |
-| PARKING | 주차 중 |
-| PARKED | 주차 완료 |
+| OCCUPIED | 주차 완료, 슬롯 점유 |
 
----
-
-# Risk State
+### Parking Lot
 
 | State | Description |
 |---|---|
-| SAFE | 안전 거리 |
-| WARNING | 경고할 만한 거리 |
-| DANGER | 충돌 위험 거리 |
+| AVAILABLE | 빈 슬롯 있음 |
+| FULL | 모든 슬롯 점유 |
 
----
-
-# Gate State
+### Gate State
 
 | State | Description |
 |---|---|
 | OPEN | 게이트 열림 |
 | CLOSED | 게이트 닫힘 |
 
----
+### Gate Event
 
-# MQTT Topics
-
-MQTT topic 기준은 `docs/MQTT_TOPICS.md`에 정리한다.
-
-핵심 흐름:
-- Rpi #1은 주차 상태, 거리, 위험도, 주차 이벤트를 발행한다.
-- Rpi #1이 `PARKED`를 판단하면 `parking/control/gate`로 `CLOSE` 명령을 발행한다.
-- Rpi #2는 `parking/control/gate`를 구독해 게이트를 제어한다.
-- Rpi #2는 게이트 상태를 `parking/rpi2/gate`로 발행한다.
-- Rpi #2의 출차 버튼 이벤트는 `parking/rpi2/event`에 포함한다.
-- Rpi #3는 Rpi #1, Rpi #2의 상태와 이벤트를 구독해 DB와 Dashboard에 반영한다.
+| Event | Description |
+|---|---|
+| ENTRY_OPEN | 차량 진입 감지로 인한 게이트 open |
+| EXIT_OPEN | 출차 스위치 입력으로 인한 게이트 open |
+| AUTO_CLOSE | timer 만료로 인한 게이트 close |
 
 ---
 
-# Repository Structure
+## 동작 시나리오
+
+### 정상 입차 시나리오
+
+1. 차량이 주차장 입구에 접근한다.
+2. RPI2의 입구 초음파 센서가 차량 접근을 감지한다.
+3. RPI2는 현재 주차장 상태를 확인한다.
+4. 빈 주차 슬롯이 있는 경우, 입구 바리게이트를 open한다.
+5. 차량이 주차장 내부로 진입한다.
+6. 일정 시간이 지나면 RPI2는 바리게이트를 close한다.
+7. 차량이 주차 슬롯에 진입하면 RPI1의 슬롯 초음파 센서가 차량을 감지한다.
+8. 차량이 슬롯 내부에 일정 거리 이상 들어온 상태가 지속되면 해당 슬롯을 `OCCUPIED` 상태로 판단한다.
+9. RPI1은 슬롯 점유 상태와 거리값을 MQTT로 RPI3에 전송한다.
+10. RPI3는 수신한 데이터를 DB에 저장하고 Dashboard에 반영한다.
+11. Dashboard에는 Slot 1, Slot 2의 점유 상태와 전체 주차장 상태가 표시된다.
+
+### 만차 시나리오
+
+1. Slot 1과 Slot 2가 모두 `OCCUPIED` 상태가 되면 주차장 상태는 `FULL`로 변경된다.
+2. RPI1은 전체 주차장 상태를 `FULL`로 판단하고 MQTT를 통해 RPI3와 RPI2에 전송한다.
+3. RPI2는 입구 LED를 통해 만차 상태를 표시한다.
+4. 이후 차량이 주차장 입구에 접근하면 RPI2의 입구 초음파 센서가 차량을 감지한다.
+5. 현실 주차장처럼 바리게이트는 open되지만, LED와 Dashboard를 통해 주차 가능한 공간이 없음을 안내한다.
+6. 차량은 주차하지 않고 내부 회차 공간을 통해 출구 방향으로 이동한다.
+7. 운전자가 출차 버튼을 누르면 RPI2는 출차 이벤트를 발생시키고 바리게이트를 open한다.
+8. 일정 시간이 지나면 RPI2는 바리게이트를 close한다.
+9. RPI3는 만차 상태, 바리게이트 상태, 출차 이벤트를 DB에 저장하고 Dashboard에 표시한다.
+
+### 출차 시나리오
+
+1. 주차된 차량이 주차 슬롯에서 빠져나가기 시작한다.
+2. RPI1의 슬롯 초음파 센서는 차량과의 거리가 멀어지는 것을 감지한다.
+3. 차량이 슬롯에서 일정 거리 이상 벗어난 상태가 지속되면 해당 슬롯을 `EMPTY` 상태로 판단한다.
+4. RPI1은 변경된 슬롯 상태를 MQTT로 RPI3에 전송한다.
+5. 전체 주차장에 빈 슬롯이 생기면 주차장 상태는 `AVAILABLE`로 변경된다.
+6. 차량이 출구에 도착하면 운전자는 출차 버튼을 누른다.
+7. RPI2는 출차 버튼 입력을 감지하고 바리게이트를 open한다.
+8. RPI2는 `EXIT_OPEN` 이벤트와 게이트 상태를 MQTT로 RPI3에 전송한다.
+9. 차량이 출차한 뒤 일정 시간이 지나면 RPI2는 바리게이트를 close한다.
+10. RPI3는 출차 이벤트, 게이트 상태, 슬롯 상태 변화를 DB에 저장하고 Dashboard에 반영한다.
+
+---
+
+## MQTT Topics
+
+| Topic | Publisher | Subscriber | 용도 |
+|---|---|---|---|
+| `parking/rpi1/slot` | RPI1 | RPI3 | slot 별 주차 점유 상태 |
+| `parking/rpi1/distance` | RPI1 | RPI3 | slot 별 거리값 |
+| `parking/rpi1/lot` | RPI1 | RPI2, RPI3 | 전체 주차장 만차 여부 |
+| `parking/rpi2/gate` | RPI2 | RPI3 | 게이트 상태 전송 |
+| `parking/rpi2/event` | RPI2 | RPI3 | 진입/출차/자동닫힘 이벤트 |
+
+### `parking/rpi1/slot`
+
+```json
+{
+  "slot1": "OCCUPIED",
+  "slot2": "EMPTY"
+}
+```
+
+### `parking/rpi1/distance`
+
+```json
+{
+  "slot1": 12,
+  "slot2": 48,
+  "unit": "cm"
+}
+```
+
+### `parking/rpi1/lot`
 
 ```text
-parking-project/
+AVAILABLE
+FULL
+```
+
+### `parking/rpi2/gate`
+
+```text
+OPEN
+CLOSED
+```
+
+### `parking/rpi2/event`
+
+```json
+{
+  "event": "ENTRY_OPEN",
+  "reason": "vehicle_detected"
+}
+```
+
+```json
+{
+  "event": "EXIT_OPEN",
+  "reason": "switch_pressed"
+}
+```
+
+```json
+{
+  "event": "AUTO_CLOSE",
+  "reason": "timer_expired"
+}
+```
+
+---
+
+## 초음파 센서
+
+- 모델: HC-SR04
+- Datasheet: https://www.elecrow.com/download/HC_SR04%20Datasheet.pdf
+- 세 초음파 센서를 동시에 측정하지 않는다.
+- 초음파 간섭을 줄이기 위해 센서는 순차적으로 측정한다.
+
+---
+
+## 물리 모형
+
+- 주차장 모형: 박스 상자로 육면체 구성
+- 입구: 바리게이트
+- 내부: 주차 슬롯 2개
+- 회차 공간: 만차 시 차량이 출구 방향으로 이동할 수 있는 공간
+
+---
+
+## Repository Structure
+
+```text
+parking/
 ├── README.md
 ├── docs/
-│   ├── ESS.drawio.png
-│   ├── MQTT_TOPICS.md
-│   └── 시나리오.pdf
 ├── rpi1/
 ├── rpi2/
 └── rpi3/
@@ -168,40 +265,12 @@ parking-project/
 
 ---
 
-# Technologies
+## Technologies
 
 - Raspberry Pi
-- Linux Device Driver
 - GPIO
 - MQTT
 - SQLite
-- HTML/CSS/JavaScript
+- Dashboard
 - Python
 - C
-
----
-
-# Physical Prototype
-
-## Parking Space
-- Width: 50cm
-- Height: 30cm
-- Wall Height: 15cm
-
-## Car Model
-- Length: 15cm
-- Width: 8cm
-- Height: 6cm
-
----
-
-# Team Roles
-
-## Rpi #1
-Parking sensing and warning system
-
-## Rpi #2
-Barrier gate control
-
-## Rpi #3
-MQTT, DB, Dashboard Monitoring

@@ -2,75 +2,157 @@
 
 ---
 
-###  1. 시스템 아키텍처 및 기술 스택 (Tech Stack)
+## 1. 시스템 아키텍처 및 기술 스택
 
-기획서에 명시된 3대의 라즈베리파이(Raspberry Pi)를 효율적으로 연결하고 제어하기 위해 다음과 같은 스택을 확정합니다.
+기획서에 명시된 3대의 Raspberry Pi를 다음 역할로 분리한다.
 
-* **하드웨어 및 OS**: Raspberry Pi 3대 (Raspberry Pi OS)
-* **디바이스 제어 (Rpi #1, #2)**: C (표준 라이브러리만 사용, `/sys/class/gpio/` 인터페이스로 GPIO 직접 제어, PWM은 `/sys/class/pwm/` 인터페이스 사용)
-* **통신 프로토콜**: MQTT (실시간 비동기 통신에 최적화)
-    * **Broker**: Eclipse Mosquitto (Rpi #3에 설치)
-    * **Client**: C `libpaho-mqtt3c` 라이브러리
-* **백엔드 및 DB (Rpi #3)**: Python FastAPI (가볍고 빠른 API 서버) + SQLite
-* **프론트엔드 (Digital Twin Dashboard)**: React.js + Tailwind CSS + 2D Canvas (HTML5)
-    * `mqtt.js`를 사용하여 브라우저에서 직접 MQTT 토픽을 구독해 지연 없는 실시간 렌더링 구현.
+- **Rpi #1**: 주차 슬롯 점유 판단 노드
+- **Rpi #2**: 입구 바리게이트 제어 노드
+- **Rpi #3**: MQTT Broker, DB, Dashboard 중앙 서버
+
+기술 스택:
+- **하드웨어 및 OS**: Raspberry Pi 3대, Raspberry Pi OS
+- **Rpi #1 디바이스 제어**: Python 또는 C, GPIO 직접 제어
+- **Rpi #2 디바이스 제어**: C, `/sys/class/gpio/`, `/sys/class/pwm/` 기반 GPIO/PWM 제어
+- **통신 프로토콜**: MQTT
+- **Broker**: Eclipse Mosquitto, Rpi #3에 설치
+- **Rpi #3 백엔드 및 DB**: Python FastAPI + SQLite
+- **Dashboard**: HTML/CSS/JavaScript 또는 React 기반 웹 대시보드
 
 ---
 
-### 1.1 중요: wiringPi 라이브러리 사용 금지
+## 1.1 wiringPi 라이브러리 사용 금지
 
-**wiringPi는 사용하지 않습니다.** 이유:
+`wiringPi`는 사용하지 않는다.
+
+이유:
 - 외부 라이브러리 의존성 최소화
 - 커널 표준 인터페이스(`/sys/class/gpio/`, `/sys/class/pwm/`) 직접 사용
-- 크로스 플랫폼 호환성 향상
-- 유지보수성 및 독립성 강화
+- 유지보수성 및 독립성 확보
 
-GPIO는 `/sys/class/gpio/` 인터페이스로, PWM은 `/sys/class/pwm/` 인터페이스로 직접 제어합니다.
-
----
-
-###  2. 디바이스별 구현 가이드라인
-
-####  Rpi #1: 주차 공간 센싱 및 경고 노드
-**역할**: 센싱, 상태 판단, 경고 발생
-* **하드웨어 연동**:
-    * **Ultrasonic #1 (정면/입구)**: 주차 공간 차량 접근 감지.
-    * **Ultrasonic #2 (후면)**: 주차 완료 및 후방 충돌 감지.
-    * **Ultrasonic #3 (우측/측면)**: 측면 충돌 감지.
-* **[CRITICAL] 초음파 센서 제어 주의사항**: HC-SR04 센서 3개를 동시에 측정하면 초음파 간섭이 발생하므로, 반드시 코드 상에서 **순차적(Sequential)으로 측정**하도록 딜레이 로직을 구현해야 합니다.
-* **상태 판별 로직**: 
-    * 센서값을 바탕으로 상태를 `EMPTY`, `APPROACHING`, `PARKING`, `PARKED`로 전환하여 MQTT로 퍼블리싱.
-    * `PARKED` 상태 판단 시 `parking/control/gate` 토픽으로 `CLOSE` 명령을 발행하여 Rpi #2의 게이트 제어를 트리거함.
-* **경고 시스템 (위험도에 따른 제어)**:
-    * `SAFE` (안전 거리): LED 소등, Buzzer 무음.
-    * `WARNING` (주의 거리): LED 깜빡임, Buzzer 간헐적 beep.
-    * `DANGER` (충돌 위험): LED 점등 유지, Buzzer 연속 경고음.
-
-####  Rpi #2: 바리게이트 제어 노드
-**역할**: 게이트 모터 제어, 출차 요청 이벤트 발생
-* **하드웨어 연동**: Servo Motor (게이트 제어), Switch (출차 버튼), LED (상태 표시).
-* **제어 시나리오**:
-    * 기본 상태는 `OPEN` 유지.
-    * `parking/control/gate` 토픽에서 `CLOSE` 명령을 수신하면 서보 모터를 구동하여 `CLOSED`로 전환.
-    * 사용자가 Switch(버튼)를 누르면 출차 요청 이벤트를 `parking/rpi2/event` 토픽으로 발행하며 모터가 `OPEN` 상태로 전환.
-    * 게이트 상태(`OPEN`/`CLOSED`) 변경 시 `parking/rpi2/gate` 토픽으로 상태를 MQTT 퍼블리싱.
-
-####  Rpi #3: 중앙 서버 및 Digital Twin
-**역할**: MQTT 통신 중계, DB 데이터 저장, Dashboard 모니터링 제공. 센서/액추에이터는 연결되지 않습니다.
-* **MQTT 구독**: Rpi #1의 주차 상태, 거리, 위험도 정보와 Rpi #2의 게이트 상태(`parking/rpi2/gate`), 출차 이벤트(`parking/rpi2/event`)를 구독.
-* **DB 저장**: 구독한 모든 데이터(거리 측정값, 주차 상태, 위험도, 게이트 상태, 이벤트)를 타임스탐프와 함께 DB에 적재.
+GPIO는 `/sys/class/gpio/` 인터페이스로, PWM은 `/sys/class/pwm/` 인터페이스로 직접 제어한다.
 
 ---
 
-###  3. 2D Digital Twin Dashboard UI/UX 가이드라인 (PM 지시사항)
+## 2. 디바이스별 구현 가이드라인
 
-Rpi #3에서 호스팅될 웹 대시보드는 50x30cm의 물리적 모형을 화면에 그대로 옮겨놓은 듯한 "직관성"이 생명입니다.
+### Rpi #1: 주차 슬롯 점유 판단 노드
 
-* **레이아웃 구성**:
-    * **좌측 (70%) - 2D 주차장 View**: 위에서 아래를 내려다보는 Top-down 뷰. 센서값(거리)을 역산하여 15x8cm 크기의 자동차 컴포넌트 위치를 캔버스 상에서 실시간으로 이동시킵니다.
-    * **우측 (30%) - Status Panel**: 현재 주차 상태(EMPTY/APPROACHING 등), 각 센서별 실시간 거리(cm), 현재 위험도 상태(SAFE/WARNING/DANGER), 게이트 상태(OPEN/CLOSED)를 텍스트와 게이지 바 형태로 보여줍니다.
-* **동기화 및 시각적 피드백**:
-    * 실제 LED/Buzzer 상태와 동일하게 UI 상의 주차장 테두리 색상을 변경합니다 (SAFE: 초록, WARNING: 노랑 + 점멸 효과, DANGER: 빨강 + 경고 팝업).
-    * 좌측 하단에 게이트 아이콘을 배치하고 OPEN/CLOSED 상태에 따라 애니메이션을 적용하세요.
+역할:
+- Slot 1, Slot 2 초음파 거리 측정
+- 슬롯별 `EMPTY`/`OCCUPIED` 상태 판단
+- 전체 주차장 `AVAILABLE`/`FULL` 상태 판단
+- 슬롯별 LED 제어
+- MQTT로 슬롯 상태, 거리값, 전체 주차장 상태 발행
+
+하드웨어:
+- Ultrasonic #1: Slot 1 점유 센싱
+- Ultrasonic #2: Slot 2 점유 센싱
+- Slot 1 LED: `OCCUPIED` 점등, `EMPTY` 소등
+- Slot 2 LED: `OCCUPIED` 점등, `EMPTY` 소등
+
+상태 판별:
+- 차량이 슬롯 내부에 일정 거리 이상 들어온 상태가 지속되면 `OCCUPIED`로 판단한다.
+- 차량과의 거리가 기준 이상 멀어진 상태가 지속되면 `EMPTY`로 판단한다.
+- Slot 1과 Slot 2가 모두 `OCCUPIED`이면 주차장 상태를 `FULL`로 판단한다.
+- 하나 이상의 슬롯이 `EMPTY`이면 주차장 상태를 `AVAILABLE`로 판단한다.
+
+초음파 센서 주의사항:
+- HC-SR04 센서를 동시에 측정하지 않는다.
+- 초음파 간섭을 방지하기 위해 각 센서는 순차적으로 측정한다.
+- 튀는 거리값에 대비해 이동평균 또는 중앙값 필터를 적용한다.
+
+발행 토픽:
+- `parking/rpi1/slot`
+- `parking/rpi1/distance`
+- `parking/rpi1/lot`
+
+### Rpi #2: 바리게이트 제어 노드
+
+역할:
+- 입구 초음파 센서로 차량 접근 감지
+- RPI1의 주차장 상태(`AVAILABLE`/`FULL`) 수신
+- Servo Motor로 게이트 open/close 제어
+- 출차 스위치 입력 처리
+- 만차 LED 및 출차 이벤트 LED/Buzzer 제어
+- MQTT로 게이트 상태와 이벤트 발행
+
+하드웨어:
+- Ultrasonic #3: 주차장 입구 차량 접근 감지
+- Switch: 출차 요청 버튼
+- Servo Motor: 게이트 open/close
+- LED: 만차 상태 표시
+- LED/Buzzer: 출차 이벤트 상태 표시
+
+제어 시나리오:
+- 입구 초음파 센서가 차량 접근을 감지하면 게이트를 `OPEN`한다.
+- 게이트가 열린 뒤 일정 시간이 지나면 `CLOSED`로 전환한다.
+- 게이트가 열린 상태에서 차량 접근이 새로 감지되면 close timer를 갱신한다.
+- 출차 스위치가 눌리면 게이트를 `OPEN`하고 `EXIT_OPEN` 이벤트를 발행한다.
+- RPI1에서 `FULL`을 수신하면 만차 LED를 점등한다.
+- 만차 상태에서도 차량 접근 시 게이트는 열리며, LED와 Dashboard로 주차 가능 공간이 없음을 안내한다.
+
+구독 토픽:
+- `parking/rpi1/lot`
+
+발행 토픽:
+- `parking/rpi2/gate`
+- `parking/rpi2/event`
+
+### Rpi #3: 중앙 서버 및 Dashboard
+
+역할:
+- MQTT Broker 실행
+- RPI1/RPI2 메시지 구독
+- 슬롯 점유 상태 저장
+- 게이트 상태 저장
+- 이벤트 로그 저장
+- Dashboard에 실시간 상태 표시
+
+구독 토픽:
+- `parking/rpi1/slot`
+- `parking/rpi1/distance`
+- `parking/rpi1/lot`
+- `parking/rpi2/gate`
+- `parking/rpi2/event`
+
+DB 저장 항목:
+- 슬롯별 점유 상태
+- 슬롯별 거리값
+- 전체 주차장 상태
+- 게이트 상태
+- 게이트 이벤트
+- 수신 시간
 
 ---
+
+## 3. Dashboard UI 가이드라인
+
+Dashboard는 실제 주차장 모형의 현재 상태를 빠르게 파악할 수 있도록 구성한다.
+
+표시 항목:
+- Slot 1 상태: `EMPTY` / `OCCUPIED`
+- Slot 2 상태: `EMPTY` / `OCCUPIED`
+- Parking Lot 상태: `AVAILABLE` / `FULL`
+- Gate 상태: `OPEN` / `CLOSED`
+- 최근 이벤트 로그
+
+권장 레이아웃:
+- 좌측: 2개 슬롯과 입구 바리게이트를 보여주는 Top-down 주차장 View
+- 우측: 슬롯 상태, 거리값, 전체 주차장 상태, 게이트 상태, 최근 이벤트 로그 패널
+
+시각적 피드백:
+- `EMPTY` 슬롯은 비어 있는 상태로 표시한다.
+- `OCCUPIED` 슬롯은 차량 또는 점유 색상으로 표시한다.
+- `FULL` 상태는 Dashboard와 입구 LED 상태가 일치하도록 강조한다.
+- `OPEN`/`CLOSED`에 따라 바리게이트 아이콘 또는 애니메이션을 변경한다.
+
+---
+
+## 4. 물리 모형 제작 기준
+
+- 주차장 모형은 박스 상자로 육면체를 구성한다.
+- 입구에는 서보 모터 기반 바리게이트를 배치한다.
+- 내부에는 Slot 1, Slot 2를 구분해 배치한다.
+- 만차 시 차량이 주차하지 않고 이동할 수 있는 회차 공간을 확보한다.
+- 센서는 초음파 간섭을 줄일 수 있도록 측정 방향과 간격을 조정한다.
