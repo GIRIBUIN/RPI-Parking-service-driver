@@ -29,8 +29,7 @@ Publish-Mqtt "parking/rpi2/gate" "CLOSED"
 Publish-Mqtt "parking/rpi2/event" '{"event":"ENTRY_OPEN","reason":"vehicle_detected"}'
 Publish-Mqtt "parking/rpi2/gate" "OPEN"
 
-# 3. Gate auto closes after entry
-Publish-Mqtt "parking/rpi2/event" '{"event":"AUTO_CLOSE","reason":"timer_expired"}'
+# 3. Gate closes after entry timer
 Publish-Mqtt "parking/rpi2/gate" "CLOSED"
 
 # 4. Vehicle parks in Slot 1
@@ -41,7 +40,6 @@ Publish-Mqtt "parking/rpi1/lot" "AVAILABLE"
 # 5. Another vehicle enters
 Publish-Mqtt "parking/rpi2/event" '{"event":"ENTRY_OPEN","reason":"vehicle_detected"}'
 Publish-Mqtt "parking/rpi2/gate" "OPEN"
-Publish-Mqtt "parking/rpi2/event" '{"event":"AUTO_CLOSE","reason":"timer_expired"}'
 Publish-Mqtt "parking/rpi2/gate" "CLOSED"
 
 # 6. Vehicle parks in Slot 2, parking lot becomes full
@@ -54,7 +52,6 @@ Publish-Mqtt "parking/rpi1/lot" "FULL"
 # The gate opens, but Dashboard/LED indicates FULL and the vehicle turns around inside.
 Publish-Mqtt "parking/rpi2/event" '{"event":"ENTRY_OPEN","reason":"vehicle_detected_full_lot"}'
 Publish-Mqtt "parking/rpi2/gate" "OPEN"
-Publish-Mqtt "parking/rpi2/event" '{"event":"AUTO_CLOSE","reason":"timer_expired"}'
 Publish-Mqtt "parking/rpi2/gate" "CLOSED"
 
 # 8. Exit request
@@ -66,8 +63,7 @@ Publish-Mqtt "parking/rpi1/slot" '{"slot1":"EMPTY","slot2":"OCCUPIED"}'
 Publish-Mqtt "parking/rpi1/distance" '{"slot1":50,"slot2":10,"unit":"cm"}'
 Publish-Mqtt "parking/rpi1/lot" "AVAILABLE"
 
-# 10. Gate auto closes after exit
-Publish-Mqtt "parking/rpi2/event" '{"event":"AUTO_CLOSE","reason":"timer_expired"}'
+# 10. Gate closes after exit timer
 Publish-Mqtt "parking/rpi2/gate" "CLOSED"
 
 Write-Host "=== Parking Monitoring Simulation End ==="

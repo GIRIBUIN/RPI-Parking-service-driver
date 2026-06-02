@@ -23,7 +23,7 @@ parking/
 | `parking/rpi1/distance` | RPI1 | RPI3, Dashboard | Slot 1, Slot 2 초음파 거리값 |
 | `parking/rpi1/lot` | RPI1 | RPI2, RPI3, Dashboard | 전체 주차장 상태 |
 | `parking/rpi2/gate` | RPI2 | RPI3, Dashboard | 현재 게이트 상태 |
-| `parking/rpi2/event` | RPI2 | RPI3, Dashboard | 진입, 출차, 자동 닫힘 이벤트 |
+| `parking/rpi2/event` | RPI2 | RPI3, Dashboard | 진입, 출차 이벤트 |
 
 ---
 
@@ -56,7 +56,6 @@ parking/
 |---|---|---|
 | `ENTRY_OPEN` | `vehicle_detected` | 입구 차량 접근 감지로 게이트 open |
 | `EXIT_OPEN` | `switch_pressed` | 출차 버튼 입력으로 게이트 open |
-| `AUTO_CLOSE` | `timer_expired` | timer 만료로 게이트 close |
 
 ---
 
@@ -68,7 +67,7 @@ parking/
 - RPI2는 `parking/rpi1/lot`을 구독해 만차 LED 표시 여부를 결정한다.
 - RPI2는 입구 초음파 센서로 차량 접근을 감지하면 게이트를 `OPEN`하고 `ENTRY_OPEN` 이벤트를 발행한다.
 - RPI2는 출차 스위치 입력을 감지하면 게이트를 `OPEN`하고 `EXIT_OPEN` 이벤트를 발행한다.
-- RPI2는 게이트 open 후 timer가 만료되면 `CLOSED`로 전환하고 `AUTO_CLOSE` 이벤트를 발행한다.
+- RPI2는 게이트 open 후 timer가 만료되면 `parking/rpi2/gate`에 `CLOSED`를 발행한다.
 - RPI2는 차량 접근이 새로 감지되면 close timer를 갱신한다.
 - RPI3는 RPI1/RPI2의 상태와 이벤트를 구독해 DB와 Dashboard에 반영한다.
 - Dashboard는 MQTT over WebSocket으로 동일 topic을 직접 구독해 화면을 갱신한다.
@@ -123,12 +122,5 @@ CLOSED
 {
   "event": "EXIT_OPEN",
   "reason": "switch_pressed"
-}
-```
-
-```json
-{
-  "event": "AUTO_CLOSE",
-  "reason": "timer_expired"
 }
 ```

@@ -119,7 +119,6 @@ Dashboard 표시 항목:
 |---|---|
 | ENTRY_OPEN | 차량 진입 감지로 인한 게이트 open |
 | EXIT_OPEN | 출차 스위치 입력으로 인한 게이트 open |
-| AUTO_CLOSE | timer 만료로 인한 게이트 close |
 
 ---
 
@@ -174,7 +173,7 @@ Dashboard 표시 항목:
 | `parking/rpi1/distance` | RPI1 | RPI3 | slot 별 거리값 |
 | `parking/rpi1/lot` | RPI1 | RPI2, RPI3 | 전체 주차장 만차 여부 |
 | `parking/rpi2/gate` | RPI2 | RPI3 | 게이트 상태 전송 |
-| `parking/rpi2/event` | RPI2 | RPI3 | 진입/출차/자동닫힘 이벤트 |
+| `parking/rpi2/event` | RPI2 | RPI3 | 진입/출차 이벤트 |
 
 ### `parking/rpi1/slot`
 
@@ -222,13 +221,6 @@ CLOSED
 {
   "event": "EXIT_OPEN",
   "reason": "switch_pressed"
-}
-```
-
-```json
-{
-  "event": "AUTO_CLOSE",
-  "reason": "timer_expired"
 }
 ```
 

@@ -42,7 +42,7 @@ RPI3: Central Server
 * Slot별 초음파 거리값 저장
 * Parking Lot 상태 저장
 * Gate OPEN/CLOSED 상태 저장
-* ENTRY_OPEN / EXIT_OPEN / AUTO_CLOSE 이벤트 저장
+* ENTRY_OPEN / EXIT_OPEN 이벤트 저장
 * Dashboard에서 주차장 상태 시각화
 * Dashboard에서 MQTT over WebSocket 직접 구독
 
@@ -169,7 +169,7 @@ parking/#
 | `parking/rpi1/distance` | RPI1      | RPI3       | JSON    | Slot 1/2 거리값   |
 | `parking/rpi1/lot`      | RPI1      | RPI2, RPI3 | TEXT    | 전체 주차장 상태      |
 | `parking/rpi2/gate`     | RPI2      | RPI3       | TEXT    | 게이트 상태         |
-| `parking/rpi2/event`    | RPI2      | RPI3       | JSON    | 입차/출차/자동닫힘 이벤트 |
+| `parking/rpi2/event`    | RPI2      | RPI3       | JSON    | 입차/출차 이벤트 |
 
 ---
 
@@ -249,15 +249,6 @@ CLOSED
 }
 ```
 
-```json
-{
-  "event": "AUTO_CLOSE",
-  "reason": "timer_expired"
-}
-```
-
----
-
 # State Definition
 
 ## Slot State
@@ -293,7 +284,6 @@ CLOSED
 | ------------ | ------------------- |
 | `ENTRY_OPEN` | 입구 차량 접근으로 바리게이트 열림 |
 | `EXIT_OPEN`  | 출차 버튼 입력으로 바리게이트 열림 |
-| `AUTO_CLOSE` | 타이머 만료로 바리게이트 자동 닫힘 |
 
 ---
 
@@ -340,7 +330,7 @@ Slot 1/2의 점유 상태와 거리값을 저장한다.
 
 ## event_log
 
-입차/출차/자동닫힘 이벤트를 저장한다.
+입차/출차 이벤트를 저장한다.
 
 | Column       | Description     |
 | ------------ | --------------- |
