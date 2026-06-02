@@ -203,10 +203,8 @@ int main(void) {
         buzzer_off();
       }
     } else {
-      if (buzzer_phase != 0) {
-        buzzer_phase = 0;
-        buzzer_off();
-      }
+      buzzer_phase = 0;
+      buzzer_off();
     }
 
     usleep(100000);  // 100ms

@@ -190,10 +190,8 @@ static int state_machine_thread_fn(void *data) {
       else
         buzzer_off();
     } else {
-      if (buzzer_phase != 0) {
-        buzzer_phase = 0;
-        buzzer_off();
-      }
+      buzzer_phase = 0;
+      buzzer_off();
     }
 
     msleep(100);  // 100ms 주기로 상태 체크
