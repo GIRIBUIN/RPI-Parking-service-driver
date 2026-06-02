@@ -274,6 +274,17 @@ void gate_hw_cleanup(void) {
     free_irq(switch_irq, NULL);
   }
 
+  // BCM GPIO는 gpio_free() 이후에도 마지막 핀 상태를 유지함
+  // gpio_free 전에 모든 출력 핀을 LOW로 내려야 함 (특히 부저)
+  gpio_set_value(BUZZER_PIN, 0);
+  gpio_set_value(ENTRY_LED_PIN, 0);
+  gpio_set_value(FULL_LED_PIN, 0);
+  gpio_set_value(STEPPER_IN1, 0);
+  gpio_set_value(STEPPER_IN2, 0);
+  gpio_set_value(STEPPER_IN3, 0);
+  gpio_set_value(STEPPER_IN4, 0);
+  gpio_set_value(ULTRASONIC_TRIG_PIN, 0);
+
   // Critical-3: 할당된 GPIO만 해제
   for (i = 0; i < ARRAY_SIZE(all_pins); i++) {
     if (gpio_allocated[i]) {

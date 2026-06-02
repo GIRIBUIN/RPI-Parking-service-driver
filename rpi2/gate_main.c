@@ -196,6 +196,8 @@ static int state_machine_thread_fn(void *data) {
     msleep(100);  // 100ms 주기로 상태 체크
   }
 
+  buzzer_off();
+  entry_led_set(0);
   pr_info("State machine thread stopped\n");
   return 0;
 }
