@@ -19,11 +19,11 @@ parking/
 
 | Topic | Publisher | Subscriber | 용도 |
 |---|---|---|---|
-| `parking/rpi1/slot` | RPI1 | RPI3 | Slot 1, Slot 2 점유 상태 |
-| `parking/rpi1/distance` | RPI1 | RPI3 | Slot 1, Slot 2 초음파 거리값 |
-| `parking/rpi1/lot` | RPI1 | RPI2, RPI3 | 전체 주차장 상태 |
-| `parking/rpi2/gate` | RPI2 | RPI3 | 현재 게이트 상태 |
-| `parking/rpi2/event` | RPI2 | RPI3 | 진입, 출차, 자동 닫힘 이벤트 |
+| `parking/rpi1/slot` | RPI1 | RPI3, Dashboard | Slot 1, Slot 2 점유 상태 |
+| `parking/rpi1/distance` | RPI1 | RPI3, Dashboard | Slot 1, Slot 2 초음파 거리값 |
+| `parking/rpi1/lot` | RPI1 | RPI2, RPI3, Dashboard | 전체 주차장 상태 |
+| `parking/rpi2/gate` | RPI2 | RPI3, Dashboard | 현재 게이트 상태 |
+| `parking/rpi2/event` | RPI2 | RPI3, Dashboard | 진입, 출차, 자동 닫힘 이벤트 |
 
 ---
 
@@ -71,6 +71,7 @@ parking/
 - RPI2는 게이트 open 후 timer가 만료되면 `CLOSED`로 전환하고 `AUTO_CLOSE` 이벤트를 발행한다.
 - RPI2는 차량 접근이 새로 감지되면 close timer를 갱신한다.
 - RPI3는 RPI1/RPI2의 상태와 이벤트를 구독해 DB와 Dashboard에 반영한다.
+- Dashboard는 MQTT over WebSocket으로 동일 topic을 직접 구독해 화면을 갱신한다.
 
 ---
 

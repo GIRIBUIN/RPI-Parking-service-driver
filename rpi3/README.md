@@ -44,7 +44,7 @@ RPI3: Central Server
 * Gate OPEN/CLOSED 상태 저장
 * ENTRY_OPEN / EXIT_OPEN / AUTO_CLOSE 이벤트 저장
 * Dashboard에서 주차장 상태 시각화
-* 500ms 주기 Dashboard 상태 갱신
+* Dashboard에서 MQTT over WebSocket 직접 구독
 
 ---
 
@@ -56,6 +56,7 @@ rpi3/
 ├── requirements.txt
 ├── app.py
 ├── mqtt_handler.py
+├── mosquitto-websocket.conf
 ├── db.py
 ├── schema.sql
 ├── simulate_parking.ps1
@@ -77,7 +78,7 @@ Flask Web Server.
 역할:
 
 * Dashboard HTML 제공
-* `/api/state` API 제공
+* 초기 Dashboard 상태 조회용 `/api/state` API 제공
 * DB 초기화
 
 실행:
@@ -376,14 +377,15 @@ paho-mqtt
 Windows에서 Mosquitto 설치 후:
 
 ```powershell
-cd "C:\Program Files\Mosquitto"
-.\mosquitto.exe -v
+cd rpi3
+& "C:\Program Files\Mosquitto\mosquitto.exe" -c .\mosquitto-websocket.conf -v
 ```
 
 Linux/Raspberry Pi:
 
 ```bash
-sudo systemctl start mosquitto
+cd rpi3
+mosquitto -c mosquitto-websocket.conf -v
 ```
 
 ---
@@ -413,6 +415,8 @@ python app.py
 ```text
 http://localhost:5000
 ```
+
+Dashboard는 처음 로딩할 때만 `/api/state`로 DB의 최신 상태를 가져오고, 이후에는 브라우저가 `ws://<RPI3_IP>:9001`로 MQTT topic을 직접 구독해 화면을 갱신한다.
 
 ---
 
@@ -456,7 +460,7 @@ mosquitto_pub -h localhost -t parking/rpi2/event -m "{\"event\":\"ENTRY_OPEN\",\
 
 ## GET /api/state
 
-현재 Dashboard 상태를 JSON으로 반환한다.
+초기 Dashboard 상태를 JSON으로 반환한다.
 
 응답 예시:
 
@@ -487,8 +491,9 @@ mosquitto_pub -h localhost -t parking/rpi2/event -m "{\"event\":\"ENTRY_OPEN\",\
 실시간성 확보 방식:
 
 1. RPI3는 MQTT 메시지를 수신하는 즉시 SQLite에 저장한다.
-2. Dashboard는 `/api/state`를 500ms 주기로 polling한다.
-3. 최신 상태는 API 응답을 통해 즉시 화면에 반영된다.
+2. Dashboard는 최초 로딩 시 `/api/state`를 한 번 호출해 DB의 최신 상태를 복원한다.
+3. 이후 Dashboard는 MQTT over WebSocket으로 `parking/rpi1/slot`, `parking/rpi1/distance`, `parking/rpi1/lot`, `parking/rpi2/gate`, `parking/rpi2/event`를 직접 subscribe한다.
+4. 새 MQTT 메시지가 도착하면 브라우저 콜백에서 화면을 즉시 갱신한다.
 
 ---
 
@@ -499,3 +504,18 @@ mosquitto_pub -h localhost -t parking/rpi2/event -m "{\"event\":\"ENTRY_OPEN\",\
 * 게이트 제어는 RPI2가 담당한다.
 * 슬롯 점유 판단은 RPI1이 담당한다.
 * RPI3는 각 노드에서 발생한 상태와 이벤트를 저장하고 시각화한다.
+## mosquitto-websocket.conf
+
+Mosquitto Broker에서 일반 MQTT와 브라우저용 MQTT over WebSocket을 함께 열기 위한 설정 예시.
+
+```text
+listener 1883
+protocol mqtt
+
+listener 9001
+protocol websockets
+```
+
+RPI1/RPI2는 `1883` 포트로 publish/subscribe하고, Dashboard 브라우저는 `9001` 포트로 MQTT topic을 직접 subscribe한다.
+
+---

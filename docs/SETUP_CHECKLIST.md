@@ -48,6 +48,17 @@ mosquitto_pub --version
 mosquitto_sub --version
 ```
 
+### MQTT over WebSocket 확인
+
+- [ ] RPI3에서 브라우저용 WebSocket 포트 `9001`을 열도록 Mosquitto 실행
+
+```bash
+mosquitto -c rpi3/mosquitto-websocket.conf -v
+```
+
+- [ ] RPI1/RPI2 일반 MQTT 포트 `1883` 연결 확인
+- [ ] Dashboard 브라우저 MQTT WebSocket 포트 `9001` 연결 확인
+
 ---
 
 ## RPI별 설정
@@ -102,7 +113,7 @@ make
 
 ```bash
 sudo apt-get install mosquitto
-sudo systemctl start mosquitto
+mosquitto -c rpi3/mosquitto-websocket.conf -v
 ```
 
 - [ ] Python 의존성 설치
@@ -113,6 +124,7 @@ pip install -r requirements.txt
 
 - [ ] SQLite DB 스키마 초기화
 - [ ] Dashboard 실행 확인
+- [ ] Dashboard의 MQTT 상태가 `CONNECTED`로 표시되는지 확인
 - [ ] 다음 토픽 구독 및 저장 확인
 
 ```text
@@ -144,6 +156,7 @@ parking/rpi2/event
 - [ ] RPI1 -> RPI2/RPI3 `parking/rpi1/lot` 수신 확인
 - [ ] RPI2 -> RPI3 `parking/rpi2/gate` 수신 확인
 - [ ] RPI2 -> RPI3 `parking/rpi2/event` 수신 확인
+- [ ] Dashboard가 `/api/state` 반복 호출 없이 MQTT 메시지 수신 시 화면을 갱신하는지 확인
 
 ### Phase 3: 통합 시나리오 테스트
 
@@ -189,6 +202,7 @@ ps aux | grep mosquitto
 ```
 
 - [ ] RPI1/RPI2에서 RPI3 1883 포트 연결 확인
+- [ ] 브라우저에서 RPI3 9001 WebSocket 포트 접근 가능 여부 확인
 
 ```bash
 telnet <RPI3_IP> 1883
