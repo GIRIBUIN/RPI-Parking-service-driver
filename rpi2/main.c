@@ -152,6 +152,10 @@ int main(void) {
 
         gate_close();
         entry_led_off();
+        pthread_mutex_lock(&state_mutex);
+        buzzer_phase = 0;
+        pthread_mutex_unlock(&state_mutex);
+        buzzer_off();
         printf("5초 경과 — 게이트 닫음, LED OFF\n");
       }
       break;
@@ -171,6 +175,10 @@ int main(void) {
         pthread_mutex_unlock(&state_mutex);
 
         entry_led_off();
+        pthread_mutex_lock(&state_mutex);
+        buzzer_phase = 0;
+        pthread_mutex_unlock(&state_mutex);
+        buzzer_off();
         gate_close();
         printf("10초 경과 (차량 미감지) — LED OFF, 게이트 닫음 (타임아웃)\n");
       }
@@ -184,6 +192,10 @@ int main(void) {
         pthread_mutex_unlock(&state_mutex);
 
         entry_led_off();
+        pthread_mutex_lock(&state_mutex);
+        buzzer_phase = 0;
+        pthread_mutex_unlock(&state_mutex);
+        buzzer_off();
         gate_close();
         printf("[%.1f cm] 차량 빠져나감 — 출차 완료, LED OFF, 게이트 닫음\n", dist);
       }

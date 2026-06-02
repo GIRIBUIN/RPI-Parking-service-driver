@@ -136,6 +136,8 @@ static int state_machine_thread_fn(void *data) {
         pr_info("5초 경과 — 게이트 닫음, LED OFF\n");
         gate_close();
         entry_led_set(0);
+        buzzer_phase = 0;
+        buzzer_off();
         gate_set_state(STATE_IDLE);
       } else if (distance_cm > 0 && distance_cm <= VEHICLE_DETECT_CM) {
         pr_info("[%d cm] 재진입 감지 — 게이트 열림 상태 유지\n", distance_cm);
@@ -156,6 +158,8 @@ static int state_machine_thread_fn(void *data) {
           gate_set_state(STATE_IDLE);  // BUG-4: 상태 먼저 변경
           gate_close();
           entry_led_set(0);
+          buzzer_phase = 0;
+          buzzer_off();
         }
       }
       break;
@@ -168,6 +172,8 @@ static int state_machine_thread_fn(void *data) {
         pr_info("[%d cm] 차량 빠져나감 — 출차 완료, LED OFF, 게이트 닫음\n", distance_cm);
         gate_close();
         entry_led_set(0);
+        buzzer_phase = 0;
+        buzzer_off();
         gate_set_state(STATE_IDLE);
       }
 
@@ -176,6 +182,8 @@ static int state_machine_thread_fn(void *data) {
         pr_info("10초 경과 (차량 미감지) — LED OFF, 게이트 닫음 (타임아웃)\n");
         gate_close();
         entry_led_set(0);
+        buzzer_phase = 0;
+        buzzer_off();
         gate_set_state(STATE_IDLE);
       }
       break;
