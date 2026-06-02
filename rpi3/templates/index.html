@@ -63,6 +63,10 @@
                         <dt>Last Updated</dt>
                         <dd id="last-updated">-</dd>
                     </div>
+                    <div>
+                        <dt>MQTT</dt>
+                        <dd id="mqtt-status">DISCONNECTED</dd>
+                    </div>
                 </dl>
 
                 <h2>Events</h2>
@@ -71,6 +75,7 @@
         </section>
     </main>
 
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
 </body>
 </html>
