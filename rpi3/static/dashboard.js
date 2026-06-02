@@ -1,10 +1,6 @@
 const MQTT_WS_PORT = 9001;
 const MQTT_TOPICS = [
-    "parking/rpi1/slot",
-    "parking/rpi1/distance",
-    "parking/rpi1/lot",
-    "parking/rpi2/gate",
-    "parking/rpi2/event",
+    "parking/#",
 ];
 
 let recentEvents = [];
@@ -131,6 +127,11 @@ function updateLastUpdated() {
     setText("last-updated", new Date().toLocaleString());
 }
 
+function updateLastMqttMessage(topic, payload) {
+    setText("last-mqtt-topic", topic);
+    setText("last-mqtt-payload", payload);
+}
+
 function applyState(data) {
     dashboardState = {
         slot: {
@@ -240,15 +241,23 @@ function connectMqtt() {
             if (error) {
                 setMqttStatus("SUBSCRIBE FAILED");
                 console.error("MQTT subscribe failed:", error);
+                return;
             }
+
+            setMqttStatus("SUBSCRIBED");
         });
     });
 
     client.on("message", (topic, message) => {
+        const payload = message.toString();
+        console.log("MQTT message received:", topic, payload);
+        updateLastMqttMessage(topic, payload);
+
         try {
-            handleMqttMessage(topic, message.toString());
+            handleMqttMessage(topic, payload);
         } catch (error) {
             console.error("Failed to handle MQTT message:", topic, error);
+            setMqttStatus("MESSAGE ERROR");
         }
     });
 

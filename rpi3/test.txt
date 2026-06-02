@@ -1,0 +1,18 @@
+
+1. Mosquitto Broker
+cd rpi3
+& "C:\Program Files\Mosquitto\mosquitto.exe" -c .\mosquitto-websocket.conf -v
+
+2. MQTT handler
+cd rpi3
+python mqtt_handler.py
+
+3. Dashboard server
+cd rpi3
+python app.py
+
+http://localhost:5000
+
+4. simulate_parking
+cd rpi3
+.\simulate_parking.ps1

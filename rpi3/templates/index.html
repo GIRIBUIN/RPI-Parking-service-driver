@@ -67,6 +67,14 @@
                         <dt>MQTT</dt>
                         <dd id="mqtt-status">DISCONNECTED</dd>
                     </div>
+                    <div>
+                        <dt>Last MQTT Topic</dt>
+                        <dd id="last-mqtt-topic">-</dd>
+                    </div>
+                    <div>
+                        <dt>Last MQTT Payload</dt>
+                        <dd id="last-mqtt-payload">-</dd>
+                    </div>
                 </dl>
 
                 <h2>Events</h2>
@@ -76,6 +84,6 @@
     </main>
 
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-    <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+    <script src="{{ url_for('static', filename='dashboard.js') }}?v=mqtt-ws-only"></script>
 </body>
 </html>
