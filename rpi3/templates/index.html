@@ -8,82 +8,114 @@
 </head>
 <body>
     <main class="dashboard">
-        <section class="status-strip">
+        <header class="page-header">
             <div>
-                <span class="label">Slot 1</span>
-                <strong id="slot1-state">UNKNOWN</strong>
+                <p class="eyebrow">ESS Team Project</p>
+                <h1>주차 점유 상태 모니터링</h1>
             </div>
-            <div>
-                <span class="label">Slot 2</span>
-                <strong id="slot2-state">UNKNOWN</strong>
-            </div>
-            <div>
+        </header>
+
+        <section class="summary-grid">
+            <article class="summary-card">
+                <span class="label">Available Slots</span>
+                <strong id="available-slots">-</strong>
+                <span class="hint">Slot 1 + Slot 2</span>
+            </article>
+            <article class="summary-card">
                 <span class="label">Parking Lot</span>
                 <strong id="lot-state">UNKNOWN</strong>
-            </div>
-            <div>
+                <span class="hint">AVAILABLE / FULL</span>
+            </article>
+            <article class="summary-card">
                 <span class="label">Gate</span>
                 <strong id="gate-state">UNKNOWN</strong>
-            </div>
+                <span class="hint">OPEN / CLOSED</span>
+            </article>
+            <article class="summary-card">
+                <span class="label">Last Updated</span>
+                <strong id="last-updated">-</strong>
+                <span class="hint">latest received state</span>
+            </article>
         </section>
 
-        <section class="content">
-            <div class="parking-area">
-                <div class="entrance">
-                    <span class="entrance-label">Entrance Gate</span>
-                    <div id="gate" class="gate closed"></div>
-                </div>
+        <section class="content-grid">
+            <aside class="comm-panel">
+                <section class="broker-card">
+                    <span class="label">Dashboard MQTT</span>
+                    <strong id="mqtt-status">DISCONNECTED</strong>
+                    <span class="hint">Broker 1883 / WebSocket 9001</span>
+                </section>
 
-                <div class="slot-area">
-                    <div id="slot1" class="slot unknown">
-                        <span class="slot-title">Slot 1</span>
-                        <span id="slot1-distance" class="slot-distance">-</span>
-                    </div>
+                <section class="broker-card">
+                    <span class="label">Last MQTT Topic</span>
+                    <code id="last-mqtt-topic" class="debug-value">-</code>
+                </section>
 
-                    <div id="slot2" class="slot unknown">
-                        <span class="slot-title">Slot 2</span>
-                        <span id="slot2-distance" class="slot-distance">-</span>
-                    </div>
-                </div>
-            </div>
-
-            <aside class="panel">
-                <h1>Parking Monitor</h1>
-
-                <dl class="metrics">
-                    <div>
-                        <dt>Slot 1 Distance</dt>
-                        <dd id="metric-slot1-distance">-</dd>
-                    </div>
-                    <div>
-                        <dt>Slot 2 Distance</dt>
-                        <dd id="metric-slot2-distance">-</dd>
-                    </div>
-                    <div>
-                        <dt>Last Updated</dt>
-                        <dd id="last-updated">-</dd>
-                    </div>
-                    <div>
-                        <dt>MQTT</dt>
-                        <dd id="mqtt-status">DISCONNECTED</dd>
-                    </div>
-                    <div>
-                        <dt>Last MQTT Topic</dt>
-                        <dd id="last-mqtt-topic">-</dd>
-                    </div>
-                    <div>
-                        <dt>Last MQTT Payload</dt>
-                        <dd id="last-mqtt-payload">-</dd>
-                    </div>
-                </dl>
-
-                <h2>Events</h2>
-                <ul id="events" class="events"></ul>
+                <section class="broker-card">
+                    <span class="label">Last MQTT Payload</span>
+                    <code id="last-mqtt-payload" class="debug-value">-</code>
+                </section>
             </aside>
+
+            <section class="card-section">
+                <div class="section-heading">
+                    <h2>Slot Status</h2>
+                    <p>점유 상태와 초음파 거리값</p>
+                </div>
+
+                <div class="slot-grid">
+                    <article id="slot1" class="data-card slot-card unknown">
+                        <div class="card-row">
+                            <span class="label">Slot 1</span>
+                            <span id="slot1-state" class="state-pill unknown">UNKNOWN</span>
+                        </div>
+                        <strong id="slot1-distance" class="metric-value">-</strong>
+                        <span class="hint">Ultrasonic distance</span>
+                    </article>
+
+                    <article id="slot2" class="data-card slot-card unknown">
+                        <div class="card-row">
+                            <span class="label">Slot 2</span>
+                            <span id="slot2-state" class="state-pill unknown">UNKNOWN</span>
+                        </div>
+                        <strong id="slot2-distance" class="metric-value">-</strong>
+                        <span class="hint">Ultrasonic distance</span>
+                    </article>
+                </div>
+            </section>
+
+            <section class="card-section">
+                <div class="section-heading">
+                    <h2>Gate Status</h2>
+                    <p>게이트 상태와 최근 이벤트</p>
+                </div>
+
+                <div class="gate-grid">
+                    <article id="gate" class="data-card gate-card unknown">
+                        <span class="label">Current State</span>
+                        <strong id="gate-state-detail" class="metric-value">UNKNOWN</strong>
+                        <span class="hint">parking/rpi2/gate</span>
+                    </article>
+
+                    <article class="data-card">
+                        <span class="label">Last Gate Event</span>
+                        <strong id="last-gate-event" class="metric-value">-</strong>
+                        <span id="last-gate-reason" class="hint">-</span>
+                    </article>
+                </div>
+            </section>
+
+            <section class="feed-panel">
+                <div class="section-heading">
+                    <h2>Event Feed</h2>
+                    <p>최근 게이트 이벤트</p>
+                </div>
+                <ul id="events" class="events"></ul>
+            </section>
         </section>
     </main>
 
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-    <script src="{{ url_for('static', filename='dashboard.js') }}?v=mqtt-ws-only"></script>
+    <script src="{{ url_for('static', filename='dashboard.js') }}?v=cards-feed"></script>
 </body>
 </html>

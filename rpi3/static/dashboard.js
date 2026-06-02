@@ -39,6 +39,10 @@ function setText(id, value) {
     element.textContent = value;
 }
 
+function toClassName(value) {
+    return String(value || "unknown").toLowerCase().replace(/\s+/g, "-");
+}
+
 function setStateClass(element, baseClass, state) {
     if (!element) {
         return;
@@ -51,18 +55,46 @@ function setStateClass(element, baseClass, state) {
         return;
     }
 
-    element.classList.add(String(state).toLowerCase());
+    element.classList.add(toClassName(state));
+}
+
+function updateStatePill(id, state) {
+    const element = document.getElementById(id);
+    if (!element) {
+        return;
+    }
+
+    const normalizedState = textOrUnknown(state);
+    element.textContent = normalizedState;
+    element.className = "state-pill";
+    element.classList.add(toClassName(normalizedState));
+}
+
+function updateAvailableSlots() {
+    const states = [
+        dashboardState.slot.slot1,
+        dashboardState.slot.slot2,
+    ];
+    const knownStates = states.filter((state) => state);
+
+    if (knownStates.length === 0) {
+        setText("available-slots", "-");
+        return;
+    }
+
+    setText("available-slots", String(states.filter((state) => state === "EMPTY").length));
 }
 
 function updateSlot(slotId, state, distance) {
     const slotElement = document.getElementById(slotId);
     const normalizedState = textOrUnknown(state);
 
-    setStateClass(slotElement, "slot", normalizedState);
+    setStateClass(slotElement, "data-card slot-card", normalizedState);
 
-    setText(`${slotId}-state`, normalizedState);
+    updateStatePill(`${slotId}-state`, normalizedState);
     setText(`${slotId}-distance`, formatDistance(distance));
     setText(`metric-${slotId}-distance`, formatDistance(distance));
+    updateAvailableSlots();
 }
 
 function updateLotState(state) {
@@ -75,15 +107,16 @@ function updateLotState(state) {
     }
 
     lotElement.className = "";
-    lotElement.classList.add(normalizedState.toLowerCase());
+    lotElement.classList.add(toClassName(normalizedState));
 }
 
 function updateGate(state) {
     const normalizedState = textOrUnknown(state);
     setText("gate-state", normalizedState);
+    setText("gate-state-detail", normalizedState);
 
     const gateElement = document.getElementById("gate");
-    setStateClass(gateElement, "gate", normalizedState);
+    setStateClass(gateElement, "data-card gate-card", normalizedState);
 }
 
 function updateEvents(events) {
@@ -120,7 +153,15 @@ function appendEvent(event) {
 }
 
 function setMqttStatus(status) {
-    setText("mqtt-status", status);
+    const normalizedStatus = textOrUnknown(status);
+    const element = document.getElementById("mqtt-status");
+
+    if (!element) {
+        return;
+    }
+
+    element.textContent = normalizedStatus;
+    element.className = toClassName(normalizedStatus);
 }
 
 function updateLastUpdated() {
@@ -130,6 +171,11 @@ function updateLastUpdated() {
 function updateLastMqttMessage(topic, payload) {
     setText("last-mqtt-topic", topic);
     setText("last-mqtt-payload", payload);
+}
+
+function updateLastGateEvent(eventType, reason) {
+    setText("last-gate-event", textOrUnknown(eventType));
+    setText("last-gate-reason", reason || "-");
 }
 
 function applyState(data) {
@@ -154,6 +200,10 @@ function applyState(data) {
     setText("last-updated", data.last_updated || "-");
     recentEvents = data.events || [];
     updateEvents(recentEvents);
+
+    if (recentEvents.length > 0) {
+        updateLastGateEvent(recentEvents[0].event_type, recentEvents[0].reason);
+    }
 }
 
 function handleMqttMessage(topic, payload) {
@@ -199,6 +249,7 @@ function handleMqttMessage(topic, payload) {
 
     if (topic === "parking/rpi2/event") {
         const data = JSON.parse(payload);
+        updateLastGateEvent(data.event, data.reason);
         appendEvent({
             timestamp: new Date().toLocaleString(),
             topic,
