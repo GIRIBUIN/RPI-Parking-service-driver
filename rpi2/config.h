@@ -19,15 +19,14 @@
 #define STEPPER_GATE_STEPS   1024  // 90도 회전 (4096 = 360도)
 
 // MQTT
-#define MQTT_HOST       "127.0.0.1"
+#define MQTT_HOST       "10.10.10.13"
 #define MQTT_PORT       1883
 #define MQTT_CLIENT_ID  "rpi2_gate"
 #define MQTT_KEEPALIVE  60
 
-// #define TOPIC_SUB_CAPACITY   "parking/rpi3/capacity"
-#define TOPIC_PUB_GATE       "parking/rpi2/gate"   // [검토] 게이트 상태 발행 topic
-#define TOPIC_SUB_CAPACITY   "parking/rpi1/lot"  // [검토] topic 수정
-#define TOPIC_PUB_EVENT      "parking/rpi2/event"  // [검토] 진입/출차 이벤트 발행 topic
+#define TOPIC_PUB_GATE       "parking/rpi2/gate"
+#define TOPIC_SUB_CAPACITY   "parking/rpi1/lot"
+#define TOPIC_PUB_EVENT      "parking/rpi2/event"
 
 // 디바운싱 및 타이머
 #define DEBOUNCE_MS          300
