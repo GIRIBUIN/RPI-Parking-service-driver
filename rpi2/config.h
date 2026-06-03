@@ -3,6 +3,7 @@
 
 // GPIO 핀 (BCM)
 #define ENTRY_LED_PIN        24
+#define EXIT_LED_PIN         26
 #define SWITCH_PIN           23
 #define ULTRASONIC_TRIG_PIN  17
 #define ULTRASONIC_ECHO_PIN  27
@@ -34,6 +35,6 @@
 #define EXIT_TIMEOUT_SEC     10
 
 // 초음파 임계값 (cm)
-#define VEHICLE_DETECT_CM    50
+#define VEHICLE_DETECT_CM    25
 
 #endif

@@ -26,6 +26,7 @@ void buzzer_off(void);
 
 // LED 제어
 void entry_led_set(int on);
+void exit_led_set(int on);
 void full_led_set(int on);
 
 // 하드웨어 초기화/정리

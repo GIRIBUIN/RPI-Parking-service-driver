@@ -176,21 +176,25 @@ static int state_machine_thread_fn(void *data) {
     }
 
     // 부저 패턴 처리 (상태에 따라 0.5초 on/off 반복 또는 OFF)
-    // LED도 동시에 깜빡임 (완벽한 동기화)
+    // LED도 동시에 깜빡임 (완벽한 동기화, 입차/출차 구분)
     state = gate_get_state();
     if (state != STATE_IDLE) {
+      int is_entry = (state == STATE_ENTRY_DETECTED || state == STATE_ENTRY_WAITING);
       buzzer_phase = (buzzer_phase + 1) % 10;
       if (buzzer_phase < 5) {
         buzzer_on();
-        entry_led_set(1);
+        entry_led_set(is_entry ? 1 : 0);
+        exit_led_set(is_entry ? 0 : 1);
       } else {
         buzzer_off();
         entry_led_set(0);
+        exit_led_set(0);
       }
     } else {
       buzzer_phase = 0;
       buzzer_off();
       entry_led_set(0);
+      exit_led_set(0);
     }
 
     msleep(100);  // 100ms 주기로 상태 체크
@@ -198,6 +202,7 @@ static int state_machine_thread_fn(void *data) {
 
   buzzer_off();
   entry_led_set(0);
+  exit_led_set(0);
   pr_info("State machine thread stopped\n");
   return 0;
 }

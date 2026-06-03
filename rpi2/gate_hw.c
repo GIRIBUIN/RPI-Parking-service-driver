@@ -23,10 +23,10 @@ static const int stepper_sequence[8][4] = {
 // 모든 GPIO 핀 배열 (Critical-3: GPIO 추적용)
 static int all_pins[] = {
   STEPPER_IN1, STEPPER_IN2, STEPPER_IN3, STEPPER_IN4,
-  ENTRY_LED_PIN, BUZZER_PIN, FULL_LED_PIN,
+  ENTRY_LED_PIN, EXIT_LED_PIN, BUZZER_PIN, FULL_LED_PIN,
   ULTRASONIC_TRIG_PIN, ULTRASONIC_ECHO_PIN, SWITCH_PIN
 };
-static bool gpio_allocated[10] = {false};  // 각 핀 할당 여부 추적
+static bool gpio_allocated[11] = {false};  // 각 핀 할당 여부 추적
 
 static spinlock_t hw_lock;
 static int switch_irq = -1;
@@ -112,6 +112,14 @@ void entry_led_set(int on) {
 
   spin_lock_irqsave(&hw_lock, flags);
   gpio_set_value(ENTRY_LED_PIN, on ? 1 : 0);
+  spin_unlock_irqrestore(&hw_lock, flags);
+}
+
+void exit_led_set(int on) {
+  unsigned long flags;
+
+  spin_lock_irqsave(&hw_lock, flags);
+  gpio_set_value(EXIT_LED_PIN, on ? 1 : 0);
   spin_unlock_irqrestore(&hw_lock, flags);
 }
 
@@ -205,7 +213,7 @@ int gate_hw_init(void) {
   int i;
   int out_pins[] = {
     STEPPER_IN1, STEPPER_IN2, STEPPER_IN3, STEPPER_IN4,
-    ENTRY_LED_PIN, BUZZER_PIN, FULL_LED_PIN,
+    ENTRY_LED_PIN, EXIT_LED_PIN, BUZZER_PIN, FULL_LED_PIN,
     ULTRASONIC_TRIG_PIN
   };
 
@@ -281,6 +289,7 @@ void gate_hw_cleanup(void) {
   // gpio_free 전에 모든 출력 핀을 정리해야 함 (부저는 Active Low이므로 1)
   gpio_set_value(BUZZER_PIN, 1);
   gpio_set_value(ENTRY_LED_PIN, 0);
+  gpio_set_value(EXIT_LED_PIN, 0);
   gpio_set_value(FULL_LED_PIN, 0);
   gpio_set_value(STEPPER_IN1, 0);
   gpio_set_value(STEPPER_IN2, 0);
