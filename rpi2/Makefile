@@ -44,7 +44,7 @@ scp: module
 
 # mqtt_bridge 소스를 RPI2로 전송 (RPI에서 직접 빌드)
 scp-src:
-	scp mqtt_bridge.c config.h $(RPI2_USER)@$(RPI2_IP):$(RPI2_SRC)
+	scp mqtt_bridge.c mqtt_client.c mqtt_client.h config.h $(RPI2_USER)@$(RPI2_IP):$(RPI2_SRC)
 
 help:
 	@echo "RPI2 Gate Node Module - Cross Compile Build"

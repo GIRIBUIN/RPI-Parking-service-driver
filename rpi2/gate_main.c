@@ -207,6 +207,42 @@ static int state_machine_thread_fn(void *data) {
   return 0;
 }
 
+// Character Device: read (mqtt_bridge → /dev/gate_node)
+static ssize_t gate_device_read(struct file *filp, char __user *buf,
+                                size_t len, loff_t *off) {
+  static const char * const state_strings[] = {
+    "IDLE",
+    "ENTRY_DETECTED",
+    "ENTRY_WAITING",
+    "EXIT_REQUESTED",
+    "EXIT_VEHICLE_DETECTED",
+  };
+  SystemState state;
+  const char *state_str;
+  size_t str_len;
+
+  if (*off > 0)
+    return 0;
+
+  state = gate_get_state();
+
+  if ((int)state < 0 || (int)state >= ARRAY_SIZE(state_strings))
+    state_str = "UNKNOWN";
+  else
+    state_str = state_strings[state];
+
+  str_len = strlen(state_str);
+
+  if (len < str_len)
+    return -EINVAL;
+
+  if (copy_to_user(buf, state_str, str_len))
+    return -EFAULT;
+
+  *off += str_len;
+  return (ssize_t)str_len;
+}
+
 // Character Device: write (mqtt_bridge → /dev/gate_node)
 static ssize_t gate_device_write(struct file *filp, const char __user *buf,
                                  size_t len, loff_t *off) {
@@ -238,6 +274,7 @@ static ssize_t gate_device_write(struct file *filp, const char __user *buf,
 }
 
 static const struct file_operations gate_fops = {
+  .read  = gate_device_read,
   .write = gate_device_write,
 };
 
