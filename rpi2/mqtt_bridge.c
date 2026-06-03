@@ -5,20 +5,34 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <time.h>
+#include <signal.h>
 #include <mosquitto.h>
 #include "config.h"
 
 static struct mosquitto *mosq = NULL;
 static int device_fd = -1;
+static char pid_file_path[256];
 
 static volatile int polling_running = 1;
 static pthread_t poll_thread;
 static char last_state[64] = "UNKNOWN";
 static pthread_mutex_t state_str_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+static void cleanup_pid_file(void) {
+  if (pid_file_path[0] != '\0') {
+    unlink(pid_file_path);
+  }
+}
+
+static void signal_handler(int sig) {
+  printf("[SIGNAL] Received signal %d, shutting down\n", sig);
+  cleanup_pid_file();
+  exit(0);
+}
+
 static void on_connect(struct mosquitto *m, void *userdata, int result) {
   if (result == 0) {
-    printf("[MQTT] Connected successfully\n");
+    printf("[MQTT] Connected successfully as %s\n", MQTT_CLIENT_ID);
     mosquitto_subscribe(m, NULL, TOPIC_SUB_CAPACITY, 1);
     printf("[MQTT] Subscribed: %s\n", TOPIC_SUB_CAPACITY);
   } else {
@@ -31,6 +45,8 @@ static void on_disconnect(struct mosquitto *m, void *userdata, int result) {
     printf("[MQTT] Disconnected cleanly\n");
   } else {
     printf("[MQTT] Unexpected disconnect (code: %d)\n", result);
+    // 백오프 재연결: min=2s, max=30s, exponential backoff
+    mosquitto_reconnect_delay_set(m, 2, 30, true);
   }
 }
 
@@ -130,9 +146,28 @@ static void *poll_gate_state(void *arg) {
 }
 
 int main(void) {
-  int ret;
+  int ret, pid_fd;
+  char client_id[64];
 
   printf("MQTT Bridge Starting\n");
+
+  // PID lock file 생성 (중복 인스턴스 방지)
+  snprintf(pid_file_path, sizeof(pid_file_path), "/var/run/mqtt_bridge_%d.pid", getuid());
+  pid_fd = open(pid_file_path, O_CREAT | O_EXCL | O_WRONLY, 0644);
+  if (pid_fd < 0) {
+    fprintf(stderr, "[ERROR] Another instance might be running. Check %s or remove if stale.\n", pid_file_path);
+    // 경고만 출력하고 계속 진행 (strict 모드 아님)
+  } else {
+    dprintf(pid_fd, "%d\n", getpid());
+    close(pid_fd);
+    printf("[PID] Lock file created: %s\n", pid_file_path);
+    // atexit에서 cleanup 호출
+    atexit(cleanup_pid_file);
+  }
+
+  // Signal handler 등록 (Ctrl+C 등에서 clean shutdown)
+  signal(SIGINT, signal_handler);
+  signal(SIGTERM, signal_handler);
 
   // /dev/gate_node 오픈
   device_fd = open("/dev/gate_node", O_WRONLY);
@@ -140,6 +175,7 @@ int main(void) {
     perror("Failed to open /dev/gate_node");
     fprintf(stderr,
             "Make sure the gate_node module is loaded: sudo insmod gate_node.ko\n");
+    cleanup_pid_file();
     return 1;
   }
 
@@ -148,10 +184,15 @@ int main(void) {
   // Mosquitto 초기화
   mosquitto_lib_init();
 
-  mosq = mosquitto_new(MQTT_CLIENT_ID, true, NULL);
+  // 클라이언트 ID에 PID 접미사 추가 (중복 연결 시 자동 킥아웃 방지)
+  snprintf(client_id, sizeof(client_id), "%s_%d", MQTT_CLIENT_ID, getpid());
+  printf("[MQTT] Client ID: %s\n", client_id);
+
+  mosq = mosquitto_new(client_id, true, NULL);
   if (!mosq) {
     fprintf(stderr, "Failed to create mosquitto instance\n");
     close(device_fd);
+    cleanup_pid_file();
     return 1;
   }
 
@@ -167,8 +208,12 @@ int main(void) {
     fprintf(stderr, "Failed to connect: %s\n", mosquitto_strerror(ret));
     mosquitto_destroy(mosq);
     close(device_fd);
+    cleanup_pid_file();
     return 1;
   }
+
+  // 초기 재연결 백오프 설정
+  mosquitto_reconnect_delay_set(mosq, 2, 30, true);
 
   // 비동기 루프 시작
   ret = mosquitto_loop_start(mosq);
@@ -176,6 +221,7 @@ int main(void) {
     fprintf(stderr, "Failed to start loop: %s\n", mosquitto_strerror(ret));
     mosquitto_destroy(mosq);
     close(device_fd);
+    cleanup_pid_file();
     return 1;
   }
 
@@ -187,6 +233,7 @@ int main(void) {
     mosquitto_loop_stop(mosq, true);
     mosquitto_destroy(mosq);
     close(device_fd);
+    cleanup_pid_file();
     return 1;
   }
 
@@ -210,6 +257,8 @@ int main(void) {
   if (device_fd >= 0) {
     close(device_fd);
   }
+
+  cleanup_pid_file();
 
   printf("MQTT Bridge Stopped\n");
   return 0;
