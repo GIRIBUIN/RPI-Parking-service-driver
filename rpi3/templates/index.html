@@ -115,7 +115,7 @@
         </section>
     </main>
 
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <script src="{{ url_for('static', filename='vendor/mqtt.min.js') }}"></script>
     <script src="{{ url_for('static', filename='dashboard.js') }}?v=cards-feed"></script>
 </body>
 </html>
