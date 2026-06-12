@@ -10,6 +10,18 @@
 #include <linux/string.h>
 #include <linux/timekeeping.h>
 
+/*
+ * 공유 자원:
+ * - rpi3_status 구조체(msg_count, err_count, last_topic, last_event 등)
+ *
+ * 접근 하는 프로세스:
+ * - mqtt_handler.py: /dev/rpi3_status에 write해서 status 갱신
+ * - cat/monitoring process: /proc/rpi3_status를 read해서 status 확인
+ *
+ * lock 방식, 선택 이유:
+ * - mutex 사용
+ * - /dev write와 /proc read는 process context --> sleep 해도 되니까 spinlock말고 mutex
+ */
 MODULE_LICENSE("GPL");
 
 #define DEV_NAME "rpi3_status"
