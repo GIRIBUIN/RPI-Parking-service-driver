@@ -474,7 +474,7 @@ static int __init parking_init(void)
     sensors[0].motor_pins[3] = MOTOR1_IN4;
     sensors[0].btn_pin  = BTN1;
     sensors[0].motor_step = 0;
-    sensors[0].lock_dir = 1;
+    sensors[0].lock_dir = -1;
     sensors[0].consecutive_unoccupied = 0;
     atomic_set(&sensors[0].lock_st, LOCK_FREE);
     INIT_WORK(&sensors[0].lock_work, lock_work_func);
@@ -494,7 +494,7 @@ static int __init parking_init(void)
     sensors[1].motor_pins[3] = MOTOR2_IN4;
     sensors[1].btn_pin  = BTN2;
     sensors[1].motor_step = 0;
-    sensors[1].lock_dir = -1;
+    sensors[1].lock_dir = 1;
     sensors[1].consecutive_unoccupied = 0;
     atomic_set(&sensors[1].lock_st, LOCK_FREE);
     INIT_WORK(&sensors[1].lock_work, lock_work_func);
