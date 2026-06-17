@@ -199,11 +199,11 @@ int main(void) {
         switch_close_flag = 0;
         if (gate_close_interruptible(close_vehicle_check) < 0) {
           pthread_mutex_lock(&state_mutex);
-          sys_state = STATE_EXIT_VEHICLE_DETECTED;
+          sys_state = STATE_EXIT_REQUESTED;
           state_timer = now;
           pthread_mutex_unlock(&state_mutex);
           mqtt_publish_gate_state("OPEN");
-          printf("닫힘 중 차량 재감지 — 게이트 재열기\n");
+          printf("닫힘 중 감지 — 게이트 재열기, 출차 요청 상태 복귀\n");
         } else {
           pthread_mutex_lock(&state_mutex);
           sys_state = STATE_IDLE;

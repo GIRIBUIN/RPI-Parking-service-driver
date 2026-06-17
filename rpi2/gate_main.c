@@ -156,10 +156,10 @@ static int state_machine_thread_fn(void *data) {
         if (elapsed >= EXIT_TIMEOUT_SEC) {
           pr_info("10초 경과 (차량 미감지) — 게이트 닫음 (타임아웃)\n");
           if (gate_close_interruptible() < 0) {
-            pr_info("[닫힘 중 감지] 게이트 재열기 — 출차 감지 상태 복귀\n");
+            pr_info("[닫힘 중 감지] 게이트 재열기 — 출차 요청 상태 복귀\n");
             last_vehicle_detect = now;
             exit_request_time = now;
-            gate_set_state(STATE_EXIT_VEHICLE_DETECTED);
+            gate_set_state(STATE_EXIT_REQUESTED);
           } else {
             gate_set_state(STATE_IDLE);
           }
