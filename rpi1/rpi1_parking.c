@@ -5,6 +5,7 @@
 #include <linux/fs.h>
 #include <linux/cdev.h>
 #include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/interrupt.h>
 #include <linux/workqueue.h>
 #include <linux/spinlock.h>
@@ -521,6 +522,13 @@ static int __init parking_init(void)
     if (ret) {
         printk(KERN_ERR "parking: button gpio_request_array failed: %d\n", ret);
         goto err_motor2_gpio;
+    }
+
+    // enable internal pull-up for button pins
+    for (i = 0; i < NUM_SPACES; i++) {
+        struct gpio_desc *desc = gpio_to_desc(sensors[i].btn_pin);
+        if (desc)
+            gpiod_set_pull(desc, GPIO_PULL_UP);
     }
 
     // create dedicated workqueue
