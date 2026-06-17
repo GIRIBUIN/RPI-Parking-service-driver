@@ -11,6 +11,7 @@ RPI3는 스마트 주차장 시스템의 중앙 서버 역할을 담당한다.
 - 입차/출차 이벤트 로그 저장
 - Web Dashboard 제공
 - 주차장 상태 실시간 모니터링
+- RPI3 MQTT 수집 상태를 커널 status interface로 진단
 
 ---
 
@@ -31,6 +32,7 @@ RPI3: Central Server
 - MQTT Broker
 - SQLite DB
 - Dashboard Monitoring
+- Kernel Status Interface
 ````
 
 ---
@@ -45,6 +47,7 @@ RPI3: Central Server
 * ENTRY_OPEN / EXIT_OPEN 이벤트 저장
 * Dashboard에서 주차장 상태 시각화
 * Dashboard에서 MQTT over WebSocket 직접 구독
+* `/proc/rpi3_status`로 RPI3 MQTT Handler 상태 확인
 
 ---
 
@@ -60,6 +63,9 @@ rpi3/
 ├── db.py
 ├── schema.sql
 ├── simulate_parking.ps1
+├── kernel/
+│   ├── rpi3_status.c
+│   └── Makefile
 ├── templates/
 │   └── index.html
 └── static/
@@ -104,11 +110,47 @@ MQTT Subscriber.
 * `parking/#` topic subscribe
 * topic별 payload 파싱
 * SQLite DB 저장
+* `/dev/rpi3_status`에 MQTT 수집 상태 전달
 
 실행:
 
 ```bash
 python mqtt_handler.py
+```
+
+---
+
+## kernel/rpi3_status.c
+
+RPI3 MQTT Handler 상태를 확인하기 위한 Linux kernel module.
+
+DB는 주차장 이벤트를 저장하고, 이 커널 모듈은 RPI3 서버의 수집 상태를 진단한다.
+Dashboard가 동작하지 않거나 DB 값이 갱신되지 않을 때 MQTT Handler가 메시지를 받고 있는지 확인하는 용도다.
+
+제공 인터페이스:
+
+* `/dev/rpi3_status`
+  * `mqtt_handler.py`가 상태를 write하는 character device
+* `/proc/rpi3_status`
+  * 관리자가 `cat`으로 현재 수집 상태를 확인하는 procfs 파일
+
+확인 예시:
+
+```bash
+cat /proc/rpi3_status
+```
+
+출력 예시:
+
+```text
+RPI3 Parking Status
+status: running
+message_count: 25
+error_count: 1
+last_topic: parking/rpi2/event
+last_event: ENTRY_OPEN
+last_error: invalid_slot_payload parking/rpi1/slot
+last_update_epoch: 1765540000
 ```
 
 ---
@@ -380,7 +422,31 @@ mosquitto -c mosquitto-websocket.conf -v
 
 ---
 
-## 2. MQTT Handler 실행
+## 2. RPI3 Status Kernel Module 실행
+
+Raspberry Pi Linux에서만 사용한다. Windows 개발 환경에서는 이 단계를 건너뛰어도 `mqtt_handler.py`는 정상 동작한다.
+
+```bash
+cd rpi3/kernel
+make
+sudo insmod rpi3_status.ko
+```
+
+상태 확인:
+
+```bash
+cat /proc/rpi3_status
+```
+
+모듈 제거:
+
+```bash
+sudo rmmod rpi3_status
+```
+
+---
+
+## 3. MQTT Handler 실행
 
 ```bash
 python mqtt_handler.py
@@ -394,7 +460,7 @@ Subscribed to parking/#
 
 ---
 
-## 3. Dashboard Server 실행
+## 4. Dashboard Server 실행
 
 ```bash
 python app.py

@@ -91,6 +91,45 @@ void gate_close(void) {
   spin_unlock_irqrestore(&hw_lock, flags);
 }
 
+int gate_close_interruptible(void) {
+  unsigned long flags;
+  int i, j, dist, steps_done = 0;
+  const int BATCH = 64;
+
+  for (i = 0; i < STEPPER_GATE_STEPS; i++) {
+    spin_lock_irqsave(&hw_lock, flags);
+    stepper_step = (stepper_step - 1 + 8) % 8;
+    stepper_set_pins(stepper_step);
+    spin_unlock_irqrestore(&hw_lock, flags);
+    usleep_range(STEPPER_STEP_DELAY_US, STEPPER_STEP_DELAY_US + 100);
+    steps_done++;
+
+    /* 배치마다 초음파 체크 (마지막 배치 제외) */
+    if (steps_done % BATCH == 0 && steps_done < STEPPER_GATE_STEPS) {
+      dist = ultrasonic_measure_cm();
+      if (dist > 0 && dist <= VEHICLE_DETECT_CM) {
+        pr_info("[닫힘 중단] %d cm 감지 — %d 스텝 역방향 복귀\n", dist, steps_done);
+        for (j = 0; j < steps_done; j++) {
+          spin_lock_irqsave(&hw_lock, flags);
+          stepper_step = (stepper_step + 1) % 8;
+          stepper_set_pins(stepper_step);
+          spin_unlock_irqrestore(&hw_lock, flags);
+          usleep_range(STEPPER_STEP_DELAY_US, STEPPER_STEP_DELAY_US + 100);
+        }
+        spin_lock_irqsave(&hw_lock, flags);
+        stepper_deenergize();
+        spin_unlock_irqrestore(&hw_lock, flags);
+        return -1;
+      }
+    }
+  }
+
+  spin_lock_irqsave(&hw_lock, flags);
+  stepper_deenergize();
+  spin_unlock_irqrestore(&hw_lock, flags);
+  return 0;
+}
+
 void buzzer_on(void) {
   unsigned long flags;
 

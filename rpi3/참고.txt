@@ -1,0 +1,105 @@
+네. **RPI2에는 수업 개념이 꽤 들어가 있습니다.** 다만 발표 때 “그 개념을 썼다”는 식으로 명확히 연결해서 말해야 티가 납니다.
+
+**RPI2에 이미 들어간 개념**
+- **GPIO**
+  - [rpi2/gate_hw.c](d:/10_proj/parking/rpi2/gate_hw.c:224): `gpio_request`, `gpio_direction_output/input`, `gpio_set_value`, `gpio_get_value`
+  - 스테퍼 모터, LED, 부저, 초음파 TRIG/ECHO, 스위치 GPIO를 커널에서 직접 제어합니다.
+  - 예전 user-space 방식도 [rpi2/gate_controller.c](d:/10_proj/parking/rpi2/gate_controller.c:27)에 `/sys/class/gpio` export 방식으로 남아 있습니다.
+
+- **HW Event Handling**
+  - [rpi2/gate_hw.c](d:/10_proj/parking/rpi2/gate_hw.c:258): `gpio_to_irq`
+  - [rpi2/gate_hw.c](d:/10_proj/parking/rpi2/gate_hw.c:266): `request_irq`
+  - [rpi2/gate_hw.c](d:/10_proj/parking/rpi2/gate_hw.c:189): 스위치 IRQ handler
+  - 스위치 입력을 polling만 한 게 아니라 커널 IRQ로 받는 구조라서 수업 내용과 잘 맞습니다.
+
+- **Debouncing / Time Handling**
+  - [rpi2/gate_hw.c](d:/10_proj/parking/rpi2/gate_hw.c:190): `jiffies`
+  - [rpi2/gate_hw.c](d:/10_proj/parking/rpi2/gate_hw.c:193): `time_before`, `msecs_to_jiffies`
+  - 버튼 튐을 300ms 이내 무시하는 디바운싱이 들어가 있습니다.
+
+- **Synchronization**
+  - [rpi2/gate_main.c](d:/10_proj/parking/rpi2/gate_main.c:25): kernel `mutex`
+  - [rpi2/gate_hw.c](d:/10_proj/parking/rpi2/gate_hw.c:31): `spinlock`
+  - [rpi2/gate_hw.c](d:/10_proj/parking/rpi2/gate_hw.c:34): `atomic_t`
+  - IRQ handler에서는 `atomic_set`만 하고, 실제 처리는 kthread에서 하므로 구조가 좋습니다.
+
+- **Kernel Thread / Deferred Work 비슷한 구조**
+  - [rpi2/gate_main.c](d:/10_proj/parking/rpi2/gate_main.c:332): `kthread_run`
+  - [rpi2/gate_main.c](d:/10_proj/parking/rpi2/gate_main.c:97): `kthread_should_stop`
+  - [rpi2/gate_main.c](d:/10_proj/parking/rpi2/gate_main.c:200): `msleep`
+  - 정확히 workqueue/tasklet은 아니지만, IRQ에서 바로 긴 작업을 하지 않고 kthread로 넘기는 구조라 “deferred processing”으로 설명 가능합니다.
+
+- **Character Device Driver**
+  - [rpi2/gate_main.c](d:/10_proj/parking/rpi2/gate_main.c:276): `file_operations`
+  - [rpi2/gate_main.c](d:/10_proj/parking/rpi2/gate_main.c:211): `read`
+  - [rpi2/gate_main.c](d:/10_proj/parking/rpi2/gate_main.c:247): `write`
+  - [rpi2/gate_main.c](d:/10_proj/parking/rpi2/gate_main.c:239): `copy_to_user`
+  - [rpi2/gate_main.c](d:/10_proj/parking/rpi2/gate_main.c:252): `copy_from_user`
+  - `/dev/gate_node`를 통해 user-space MQTT bridge와 kernel driver가 통신합니다. 이건 커널 실습 포인트로 강하게 말해도 됩니다.
+
+- **User/Kernel Space 연동**
+  - [rpi2/mqtt_bridge.c](d:/10_proj/parking/rpi2/mqtt_bridge.c:173): `/dev/gate_node` open
+  - [rpi2/mqtt_bridge.c](d:/10_proj/parking/rpi2/mqtt_bridge.c:85): device write
+  - [rpi2/mqtt_bridge.c](d:/10_proj/parking/rpi2/mqtt_bridge.c:110): device read
+  - 커널 드라이버는 하드웨어 제어, user-space bridge는 MQTT 통신 담당입니다.
+
+- **Process / Sysfs / Device File**
+  - `/dev/gate_node` character device 사용
+  - 예전 방식으로 `/sys/class/gpio` 기반 코드도 있음
+  - MQTT bridge에서 PID lock file도 사용합니다.
+
+**덜 들어간 개념**
+- **Serial Buses**
+  - I2C/SPI/UART 같은 serial bus는 현재 RPI2 핵심 구현에는 거의 없습니다.
+  - 온습도 센서를 I2C로 붙이면 이 부분을 채울 수 있지만, 시나리오와는 약간 덜 맞습니다.
+
+- **eBPF**
+  - 현재 없음. 이 프로젝트에 억지로 넣을 필요는 없어 보입니다.
+
+- **CPU Scheduling**
+  - 직접 scheduler policy를 제어하진 않습니다.
+  - 다만 kthread, `msleep`, polling interval, IRQ 처리 분리는 설명 가능합니다.
+
+발표에서는 이렇게 말하면 됩니다:
+
+> RPI2는 커널 모듈 기반 character device driver로 구현했습니다. 스위치 입력은 GPIO IRQ로 받고, IRQ handler에서는 atomic flag만 설정한 뒤 실제 상태 전이는 kernel thread에서 처리합니다. 모터, LED, 부저, 초음파 센서는 kernel GPIO API로 제어하고, 상태 공유에는 mutex, spinlock, atomic을 사용했습니다. User-space의 MQTT bridge는 `/dev/gate_node`를 read/write해서 커널 드라이버와 통신하고, 그 결과를 MQTT로 RPI3에 전송합니다.
+
+결론: **RPI2는 수업 개념을 충분히 쓰고 있습니다.**  
+오히려 문제는 RPI3가 Python 웹서버 느낌이 강한 쪽이라, RPI3에는 V4L2 C 카메라 캡처를 붙이면 균형이 좋아집니다.
+
+
+맞습니다. RPI3 기준으로는 최소 **3개 프로세스**가 돌아가는 구조라고 설명하면 됩니다.
+
+1. **MQTT Broker**
+   - Mosquitto
+   - RPI1/RPI2/RPI3 사이 메시지 중계
+   - TCP `1883`, WebSocket `9001`
+
+2. **MQTT Handler**
+   - `python mqtt_handler.py`
+   - `parking/#` 구독
+   - 수신 메시지를 topic별로 분류
+   - SQLite DB에 저장
+
+3. **Web Server**
+   - `python app.py`
+   - Flask Dashboard 제공
+   - `/api/state`로 DB의 최신 상태 제공
+
+그리고 브라우저까지 포함하면 이렇게 됩니다.
+
+4. **Browser Dashboard**
+   - 사용자의 웹 브라우저
+   - Flask에서 HTML/JS 로드
+   - MQTT WebSocket `9001`로 직접 subscribe
+   - 실시간 화면 갱신
+
+발표에서는 이렇게 말하면 좋습니다:
+
+> RPI3는 단일 프로그램이 아니라 Mosquitto Broker, MQTT Handler, Flask Web Server 세 개의 프로세스로 분리했습니다. Broker는 메시지 중계를 담당하고, Handler는 MQTT 데이터를 DB에 저장하며, Web Server는 Dashboard와 초기 상태 API를 제공합니다. 이렇게 분리해서 MQTT 수집과 웹 화면 제공이 서로 독립적으로 동작하도록 했습니다.
+
+조금 더 수업 개념 느낌으로 말하면:
+
+> RPI3에서는 기능별로 프로세스를 분리했습니다. Broker, 데이터 수집기, 웹 서버가 각각 독립 프로세스로 실행되므로 한 프로세스의 역할이 명확하고, 장애가 발생했을 때 어느 부분이 문제인지 분리해서 확인할 수 있습니다.
+
+즉, 네 말대로 **브로커 + 핸들러 + 웹서버 = 3개 프로세스**가 맞습니다.

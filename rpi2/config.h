@@ -34,6 +34,6 @@
 #define EXIT_TIMEOUT_SEC     10
 
 // 초음파 임계값 (cm)
-#define VEHICLE_DETECT_CM    25
+#define VEHICLE_DETECT_CM    10
 
 #endif
