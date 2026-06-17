@@ -362,15 +362,17 @@ static void lock_work_func(struct work_struct *work)
 {
     struct sensor_dev *sensor =
         container_of(work, struct sensor_dev, lock_work);
+    bool do_lock = sensor->lock_pending;
+    int dir = do_lock ? sensor->lock_dir : -sensor->lock_dir;
     int i;
 
     for (i = 0; i < LOCK_STEPS; i++) {
-        stepper_step(sensor, sensor->lock_pending ? sensor->lock_dir : -sensor->lock_dir);
+        stepper_step(sensor, dir);
     }
 
     stepper_deenergize(sensor);
 
-    if (sensor->lock_pending) {
+    if (do_lock) {
         atomic_set(&sensor->lock_st, LOCK_LOCKED);
         printk(KERN_INFO "parking: slot locked\n");
     } else {
@@ -561,7 +563,7 @@ static int __init parking_init(void)
             // 이미 등록된 IRQ 해제
             while (--i >= 0)
                 free_irq(sensors[i].btn_irq_num, &sensors[i]);
-            goto err_btn_irq;
+            goto err_irq;
         }
     }
 
@@ -569,7 +571,7 @@ static int __init parking_init(void)
     ret = alloc_chrdev_region(&dev_num, 0, 1, DEV_NAME);
     if (ret) {
         printk(KERN_ERR "parking: alloc_chrdev_region failed: %d\n", ret);
-        goto err_irq;
+        goto err_btn_irq;
     }
 
     cd_cdev = cdev_alloc();
@@ -636,6 +638,7 @@ static int __init parking_init(void)
     err_gpio:
         gpio_free_array(gpio_list, ARRAY_SIZE(gpio_list));
     return ret;
+}
 }
 
 static void __exit parking_exit(void)
