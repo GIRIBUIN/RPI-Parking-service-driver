@@ -31,9 +31,10 @@ MODULE_LICENSE("GPL");
 #define OCCUPIED_THRESHOLD_CM   5
 #define MEASURE_INTERVAL_MS     500
 
-#define LOCK_STEPS      341
-#define LOCK_TIMEOUT_MS 10000
-#define DEBOUNCE_MS     300
+#define LOCK_STEPS                  341
+#define LOCK_TIMEOUT_MS             10000
+#define DEBOUNCE_MS                 300
+#define UNOCCUPIED_RELEASE_COUNT    6
 
 #define MOTOR1_IN1  4
 #define MOTOR1_IN2  27
@@ -108,6 +109,7 @@ struct sensor_dev {
     bool                lock_pending;
     ktime_t             last_btn_time;
     struct work_struct  lock_work;
+    int                 consecutive_unoccupied;
 };
 
 static struct sensor_dev sensors[NUM_SPACES];
@@ -262,14 +264,17 @@ static void sensor_work_func(struct work_struct *work)
     case LOCK_FREE:
         if (occupied) {
             sensor->occupy_start = ktime_get();
+            sensor->consecutive_unoccupied = 0;
             atomic_set(&sensor->lock_st, LOCK_TIMING);
         }
         break;
 
     case LOCK_TIMING:
         if (!occupied) {
-            atomic_set(&sensor->lock_st, LOCK_FREE);
+            if (++sensor->consecutive_unoccupied >= UNOCCUPIED_RELEASE_COUNT)
+                atomic_set(&sensor->lock_st, LOCK_FREE);
         } else {
+            sensor->consecutive_unoccupied = 0;
             s64 elapsed_ms = ktime_to_ms(ktime_sub(ktime_get(), sensor->occupy_start));
             if (elapsed_ms >= LOCK_TIMEOUT_MS) {
                 atomic_set(&sensor->lock_st, LOCK_LOCKING);
@@ -471,6 +476,7 @@ static int __init parking_init(void)
     sensors[0].btn_pin  = BTN1;
     sensors[0].motor_step = 0;
     sensors[0].lock_dir = 1;
+    sensors[0].consecutive_unoccupied = 0;
     atomic_set(&sensors[0].lock_st, LOCK_FREE);
     INIT_WORK(&sensors[0].lock_work, lock_work_func);
 
@@ -490,6 +496,7 @@ static int __init parking_init(void)
     sensors[1].btn_pin  = BTN2;
     sensors[1].motor_step = 0;
     sensors[1].lock_dir = -1;
+    sensors[1].consecutive_unoccupied = 0;
     atomic_set(&sensors[1].lock_st, LOCK_FREE);
     INIT_WORK(&sensors[1].lock_work, lock_work_func);
 
