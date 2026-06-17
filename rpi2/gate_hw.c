@@ -104,11 +104,11 @@ int gate_close_interruptible(void) {
     usleep_range(STEPPER_STEP_DELAY_US, STEPPER_STEP_DELAY_US + 100);
     steps_done++;
 
-    /* 배치마다 초음파 체크 (마지막 배치 제외) */
+    /* 배치마다 초음파 체크 + 버튼 감지 (마지막 배치 제외) */
     if (steps_done % BATCH == 0 && steps_done < STEPPER_GATE_STEPS) {
       dist = ultrasonic_measure_cm();
-      if (dist > 0 && dist <= VEHICLE_DETECT_CM) {
-        pr_info("[닫힘 중단] %d cm 감지 — %d 스텝 역방향 복귀\n", dist, steps_done);
+      if ((dist > 0 && dist <= VEHICLE_DETECT_CM) || switch_was_pressed()) {
+        pr_info("[닫힘 중단] %d cm 감지 or 스위치 눌림 — %d 스텝 역방향 복귀\n", dist, steps_done);
         for (j = 0; j < steps_done; j++) {
           spin_lock_irqsave(&hw_lock, flags);
           stepper_step = (stepper_step + 1) % 8;

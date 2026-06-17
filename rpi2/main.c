@@ -26,6 +26,7 @@ static time_t state_timer = 0;
 static pthread_mutex_t state_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int idle_log_count = 0;  // IDLE 상태에서 3초마다 거리 출력용
 static int buzzer_phase = 0;    // 부저 페이즈 (0~9 순환, 0~4:on, 5~9:off)
+static volatile int switch_close_flag = 0;  // 닫힘 중 버튼 감지 플래그
 
 static void on_capacity(const char *status) {
   if (strcmp(status, "FULL") == 0) {
@@ -39,7 +40,12 @@ static void on_capacity(const char *status) {
 
 static int close_vehicle_check(void) {
   double d = ultrasonic_measure_cm();
-  return (d > 0 && d <= VEHICLE_DETECT_CM) ? 1 : 0;
+  if (d > 0 && d <= VEHICLE_DETECT_CM) return 1;
+  if (switch_close_flag) {
+    switch_close_flag = 0;
+    return 1;
+  }
+  return 0;
 }
 
 static void on_switch_press(void) {
@@ -47,9 +53,17 @@ static void on_switch_press(void) {
   SystemState s = sys_state;
   pthread_mutex_unlock(&state_mutex);
 
-  // 입차 처리 중 버튼 무시
+  // 입차 처리 중 버튼: 닫힘 시 재열기
   if (s == STATE_ENTRY_DETECTED || s == STATE_ENTRY_WAITING) {
-    printf("입차 처리 중 — 출차 버튼 무시\n");
+    printf("입차 처리 중 — 버튼 감지, 닫힘 중 재열기 대기\n");
+    switch_close_flag = 1;
+    return;
+  }
+
+  // 출차 처리 중 버튼: 닫힘 시 재열기
+  if (s == STATE_EXIT_REQUESTED || s == STATE_EXIT_VEHICLE_DETECTED) {
+    printf("출차 처리 중 — 버튼 감지, 닫힘 중 재열기 대기\n");
+    switch_close_flag = 1;
     return;
   }
 
@@ -154,6 +168,7 @@ int main(void) {
         printf("[%.1f cm] 차량 재감지 — 입차 상태 복귀\n", dist);
       } else if (now - state_timer >= ENTRY_CLOSE_DELAY_SEC) {
         // 5초 경과 — 게이트 닫음
+        switch_close_flag = 0;
         if (gate_close_interruptible(close_vehicle_check) < 0) {
           pthread_mutex_lock(&state_mutex);
           sys_state = STATE_ENTRY_DETECTED;
@@ -180,6 +195,7 @@ int main(void) {
         printf("[%.1f cm] 출차 차량 감지\n", dist);
       } else if (now - state_timer >= EXIT_TIMEOUT_SEC) {
         // 10초 경과 — 타임아웃, 게이트 닫음
+        switch_close_flag = 0;
         if (gate_close_interruptible(close_vehicle_check) < 0) {
           pthread_mutex_lock(&state_mutex);
           sys_state = STATE_EXIT_VEHICLE_DETECTED;
@@ -199,6 +215,7 @@ int main(void) {
     case STATE_EXIT_VEHICLE_DETECTED:
       if (dist < 0 || dist > VEHICLE_DETECT_CM) {
         // 차량 빠져나감 — 출차 완료
+        switch_close_flag = 0;
         if (gate_close_interruptible(close_vehicle_check) < 0) {
           pthread_mutex_lock(&state_mutex);
           sys_state = STATE_EXIT_VEHICLE_DETECTED;
