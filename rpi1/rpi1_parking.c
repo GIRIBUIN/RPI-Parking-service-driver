@@ -646,7 +646,6 @@ static int __init parking_init(void)
         gpio_free_array(gpio_list, ARRAY_SIZE(gpio_list));
     return ret;
 }
-}
 
 static void __exit parking_exit(void)
 {
