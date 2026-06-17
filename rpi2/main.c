@@ -174,6 +174,7 @@ int main(void) {
           sys_state = STATE_ENTRY_DETECTED;
           state_timer = now;
           pthread_mutex_unlock(&state_mutex);
+          mqtt_publish_gate_state("OPEN");
           printf("닫힘 중 차량 재감지 — 게이트 재열기\n");
         } else {
           pthread_mutex_lock(&state_mutex);
@@ -201,6 +202,7 @@ int main(void) {
           sys_state = STATE_EXIT_VEHICLE_DETECTED;
           state_timer = now;
           pthread_mutex_unlock(&state_mutex);
+          mqtt_publish_gate_state("OPEN");
           printf("닫힘 중 차량 재감지 — 게이트 재열기\n");
         } else {
           pthread_mutex_lock(&state_mutex);
@@ -221,6 +223,7 @@ int main(void) {
           sys_state = STATE_EXIT_VEHICLE_DETECTED;
           state_timer = now;
           pthread_mutex_unlock(&state_mutex);
+          mqtt_publish_gate_state("OPEN");
           printf("닫힘 중 차량 재감지 — 게이트 재열기\n");
         } else {
           pthread_mutex_lock(&state_mutex);
