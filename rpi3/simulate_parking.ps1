@@ -1,4 +1,5 @@
-$BrokerHost = "localhost"
+# $BrokerHost = "localhost"
+$BrokerHost = "192.168.4.1"
 $MosquittoPub = "C:\Program Files\Mosquitto\mosquitto_pub.exe"
 
 function Publish-Mqtt {
