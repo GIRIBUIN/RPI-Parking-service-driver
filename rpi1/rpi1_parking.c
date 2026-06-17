@@ -5,7 +5,6 @@
 #include <linux/fs.h>
 #include <linux/cdev.h>
 #include <linux/gpio.h>
-#include <linux/gpio/consumer.h>
 #include <linux/interrupt.h>
 #include <linux/workqueue.h>
 #include <linux/spinlock.h>
@@ -274,8 +273,8 @@ static void sensor_work_func(struct work_struct *work)
             if (++sensor->consecutive_unoccupied >= UNOCCUPIED_RELEASE_COUNT)
                 atomic_set(&sensor->lock_st, LOCK_FREE);
         } else {
-            sensor->consecutive_unoccupied = 0;
             s64 elapsed_ms = ktime_to_ms(ktime_sub(ktime_get(), sensor->occupy_start));
+            sensor->consecutive_unoccupied = 0;
             if (elapsed_ms >= LOCK_TIMEOUT_MS) {
                 atomic_set(&sensor->lock_st, LOCK_LOCKING);
                 sensor->lock_pending = true;
@@ -529,13 +528,6 @@ static int __init parking_init(void)
     if (ret) {
         printk(KERN_ERR "parking: button gpio_request_array failed: %d\n", ret);
         goto err_motor2_gpio;
-    }
-
-    // enable internal pull-up for button pins
-    for (i = 0; i < NUM_SPACES; i++) {
-        struct gpio_desc *desc = gpio_to_desc(sensors[i].btn_pin);
-        if (desc)
-            gpiod_set_pull(desc, GPIO_PULL_UP);
     }
 
     // create dedicated workqueue
