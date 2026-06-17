@@ -19,6 +19,7 @@ int ultrasonic_measure_cm(void);
 // 게이트 제어
 void gate_open(void);
 void gate_close(void);
+int gate_close_interruptible(void);
 
 // 부저 제어
 void buzzer_on(void);

@@ -132,8 +132,13 @@ static int state_machine_thread_fn(void *data) {
       elapsed = now - last_vehicle_detect;
       if (elapsed >= ENTRY_CLOSE_DELAY_SEC) {
         pr_info("5초 경과 — 게이트 닫음\n");
-        gate_close();
-        gate_set_state(STATE_IDLE);
+        if (gate_close_interruptible() < 0) {
+          pr_info("[닫힘 중 감지] 게이트 재열기 — 입차 상태 복귀\n");
+          last_vehicle_detect = now;
+          gate_set_state(STATE_ENTRY_DETECTED);
+        } else {
+          gate_set_state(STATE_IDLE);
+        }
       } else if (distance_cm > 0 && distance_cm <= VEHICLE_DETECT_CM) {
         pr_info("[%d cm] 재진입 감지 — 게이트 열림 상태 유지\n", distance_cm);
         last_vehicle_detect = now;
@@ -150,8 +155,14 @@ static int state_machine_thread_fn(void *data) {
         elapsed = now - exit_request_time;
         if (elapsed >= EXIT_TIMEOUT_SEC) {
           pr_info("10초 경과 (차량 미감지) — 게이트 닫음 (타임아웃)\n");
-          gate_close();
-          gate_set_state(STATE_IDLE);  // BUG-4: 상태 먼저 변경
+          if (gate_close_interruptible() < 0) {
+            pr_info("[닫힘 중 감지] 게이트 재열기 — 출차 감지 상태 복귀\n");
+            last_vehicle_detect = now;
+            exit_request_time = now;
+            gate_set_state(STATE_EXIT_VEHICLE_DETECTED);
+          } else {
+            gate_set_state(STATE_IDLE);
+          }
         }
       }
       break;
@@ -162,15 +173,27 @@ static int state_machine_thread_fn(void *data) {
         last_vehicle_detect = now;
       } else if (distance_cm > VEHICLE_DETECT_CM) {
         pr_info("[%d cm] 차량 빠져나감 — 출차 완료, 게이트 닫음\n", distance_cm);
-        gate_close();
-        gate_set_state(STATE_IDLE);
+        if (gate_close_interruptible() < 0) {
+          pr_info("[닫힘 중 감지] 게이트 재열기 — 출차 감지 상태 복귀\n");
+          last_vehicle_detect = now;
+          exit_request_time = now;
+          gate_set_state(STATE_EXIT_VEHICLE_DETECTED);
+        } else {
+          gate_set_state(STATE_IDLE);
+        }
       }
 
       elapsed = now - exit_request_time;
       if (elapsed >= EXIT_TIMEOUT_SEC) {
         pr_info("10초 경과 (차량 미감지) — 게이트 닫음 (타임아웃)\n");
-        gate_close();
-        gate_set_state(STATE_IDLE);
+        if (gate_close_interruptible() < 0) {
+          pr_info("[닫힘 중 감지] 게이트 재열기 — 출차 감지 상태 복귀\n");
+          last_vehicle_detect = now;
+          exit_request_time = now;
+          gate_set_state(STATE_EXIT_VEHICLE_DETECTED);
+        } else {
+          gate_set_state(STATE_IDLE);
+        }
       }
       break;
     }

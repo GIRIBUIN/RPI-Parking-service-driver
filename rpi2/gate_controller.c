@@ -167,6 +167,37 @@ void gate_close(void) {
   pthread_mutex_unlock(&gate_mutex);
 }
 
+int gate_close_interruptible(detect_fn_t check) {
+  int done = 0;
+  int steps;
+
+  pthread_mutex_lock(&gate_mutex);
+  if (current_state == GATE_CLOSED) {
+    pthread_mutex_unlock(&gate_mutex);
+    return 0;
+  }
+  pthread_mutex_unlock(&gate_mutex);
+
+  while (done < STEPPER_GATE_STEPS) {
+    steps = STEPPER_GATE_STEPS - done;
+    if (steps > 64) steps = 64;
+    stepper_move(-steps);
+    done += steps;
+
+    if (done < STEPPER_GATE_STEPS && check != NULL && check()) {
+      stepper_move(done);
+      stepper_deenergize();
+      return -1;
+    }
+  }
+
+  stepper_deenergize();
+  pthread_mutex_lock(&gate_mutex);
+  current_state = GATE_CLOSED;
+  pthread_mutex_unlock(&gate_mutex);
+  return 0;
+}
+
 void entry_led_on(void) {
   set_gpio_value(ENTRY_LED_PIN, 1);
 }

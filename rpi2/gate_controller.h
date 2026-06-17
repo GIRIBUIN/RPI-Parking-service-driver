@@ -6,12 +6,15 @@ typedef enum {
   GATE_CLOSED
 } GateState;
 
+typedef int (*detect_fn_t)(void);
+
 // GPIO 및 PWM 초기화
 void gate_controller_init(void);
 
 // 게이트 제어
 void gate_open(void);
 void gate_close(void);
+int gate_close_interruptible(detect_fn_t check);
 
 // LED 제어
 void entry_led_on(void);
