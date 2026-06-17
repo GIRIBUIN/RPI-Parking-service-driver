@@ -19,7 +19,7 @@
 #define STEPPER_GATE_STEPS   1024  // 90도 회전 (4096 = 360도)
 
 // MQTT
-#define MQTT_HOST       "192.168.100.160"
+#define MQTT_HOST       "192.168.4.1"
 #define MQTT_PORT       1883
 #define MQTT_CLIENT_ID  "rpi2_gate"
 #define MQTT_KEEPALIVE  60
