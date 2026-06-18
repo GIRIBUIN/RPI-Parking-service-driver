@@ -27,7 +27,7 @@ static char status_buf[STATUS_BUF_SIZE] =
     "rpi2: unknown\n"
     "rpi2_last_seen_sec: -\n";
 
-static char *rpi3_status_devnode(const struct device *dev, umode_t *mode)
+static char *rpi3_status_devnode(struct device *dev, umode_t *mode)
 {
     if (mode)
         *mode = 0666;
