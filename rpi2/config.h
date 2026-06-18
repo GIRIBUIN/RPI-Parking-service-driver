@@ -30,7 +30,7 @@
 
 // 디바운싱 및 타이머
 #define DEBOUNCE_MS          300
-#define ENTRY_CLOSE_DELAY_SEC 5
+#define ENTRY_CLOSE_DELAY_SEC 10
 #define EXIT_TIMEOUT_SEC     10
 
 // 초음파 임계값 (cm)

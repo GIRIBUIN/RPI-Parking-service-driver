@@ -94,6 +94,7 @@ void gate_close(void) {
 int gate_close_interruptible(void) {
   unsigned long flags;
   int i, j, dist, steps_done = 0;
+  int local_buzzer_phase = 0;
   const int BATCH = 64;
 
   for (i = 0; i < STEPPER_GATE_STEPS; i++) {
@@ -106,9 +107,17 @@ int gate_close_interruptible(void) {
 
     /* 배치마다 초음파 체크 + 버튼 감지 (마지막 배치 제외) */
     if (steps_done % BATCH == 0 && steps_done < STEPPER_GATE_STEPS) {
+      local_buzzer_phase = (local_buzzer_phase + 1) % 10;
+      if (local_buzzer_phase < 5) {
+        buzzer_on();
+      } else {
+        buzzer_off();
+      }
+
       dist = ultrasonic_measure_cm();
       if ((dist > 0 && dist <= VEHICLE_DETECT_CM) || switch_was_pressed()) {
         pr_info("[닫힘 중단] %d cm 감지 or 스위치 눌림 — %d 스텝 역방향 복귀\n", dist, steps_done);
+        buzzer_off();
         for (j = 0; j < steps_done; j++) {
           spin_lock_irqsave(&hw_lock, flags);
           stepper_step = (stepper_step + 1) % 8;

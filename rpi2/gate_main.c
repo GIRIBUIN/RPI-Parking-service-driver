@@ -122,7 +122,7 @@ static int state_machine_thread_fn(void *data) {
         pr_debug("[ENTRY] 거리: %d cm\n", distance_cm);
         last_vehicle_detect = now;
       } else if (distance_cm > VEHICLE_DETECT_CM) {
-        pr_info("[%d cm] 차량 사라짐 — 5초 타이머 시작\n", distance_cm);
+        pr_info("[%d cm] 차량 사라짐 — 10초 타이머 시작\n", distance_cm);
         last_vehicle_detect = now;
         gate_set_state(STATE_ENTRY_WAITING);
       }
@@ -131,7 +131,7 @@ static int state_machine_thread_fn(void *data) {
     case STATE_ENTRY_WAITING:
       elapsed = now - last_vehicle_detect;
       if (elapsed >= ENTRY_CLOSE_DELAY_SEC) {
-        pr_info("5초 경과 — 게이트 닫음\n");
+        pr_info("10초 경과 — 게이트 닫음\n");
         if (gate_close_interruptible() < 0) {
           pr_info("[닫힘 중 감지] 게이트 재열기 — 입차 상태 복귀\n");
           last_vehicle_detect = now;
@@ -172,28 +172,27 @@ static int state_machine_thread_fn(void *data) {
         pr_debug("[EXIT] 거리: %d cm\n", distance_cm);
         last_vehicle_detect = now;
       } else if (distance_cm > VEHICLE_DETECT_CM) {
-        pr_info("[%d cm] 차량 빠져나감 — 출차 완료, 게이트 닫음\n", distance_cm);
-        if (gate_close_interruptible() < 0) {
-          pr_info("[닫힘 중 감지] 게이트 재열기 — 출차 감지 상태 복귀\n");
-          last_vehicle_detect = now;
-          exit_request_time = now;
-          gate_set_state(STATE_EXIT_VEHICLE_DETECTED);
-        } else {
-          gate_set_state(STATE_IDLE);
-        }
+        pr_info("[%d cm] 차량 빠져나감 — 10초 대기 시작\n", distance_cm);
+        last_vehicle_detect = now;
+        gate_set_state(STATE_EXIT_VEHICLE_WAITING);
       }
+      break;
 
-      elapsed = now - exit_request_time;
-      if (elapsed >= EXIT_TIMEOUT_SEC) {
-        pr_info("10초 경과 (차량 미감지) — 게이트 닫음 (타임아웃)\n");
+    case STATE_EXIT_VEHICLE_WAITING:
+      elapsed = now - last_vehicle_detect;
+      if (elapsed >= ENTRY_CLOSE_DELAY_SEC) {
+        pr_info("10초 경과 — 출차 완료, 게이트 닫음\n");
         if (gate_close_interruptible() < 0) {
           pr_info("[닫힘 중 감지] 게이트 재열기 — 출차 감지 상태 복귀\n");
           last_vehicle_detect = now;
-          exit_request_time = now;
           gate_set_state(STATE_EXIT_VEHICLE_DETECTED);
         } else {
           gate_set_state(STATE_IDLE);
         }
+      } else if (distance_cm > 0 && distance_cm <= VEHICLE_DETECT_CM) {
+        pr_info("[%d cm] 차량 재감지 — 출차 감지 상태 복귀\n", distance_cm);
+        last_vehicle_detect = now;
+        gate_set_state(STATE_EXIT_VEHICLE_DETECTED);
       }
       break;
     }
@@ -239,6 +238,7 @@ static ssize_t gate_device_read(struct file *filp, char __user *buf,
     "ENTRY_WAITING",
     "EXIT_REQUESTED",
     "EXIT_VEHICLE_DETECTED",
+    "EXIT_VEHICLE_WAITING",
   };
   SystemState state;
   const char *state_str;

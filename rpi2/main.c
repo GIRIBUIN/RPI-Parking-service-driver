@@ -17,7 +17,8 @@ typedef enum {
   STATE_ENTRY_DETECTED,
   STATE_ENTRY_WAITING,
   STATE_EXIT_REQUESTED,
-  STATE_EXIT_VEHICLE_DETECTED
+  STATE_EXIT_VEHICLE_DETECTED,
+  STATE_EXIT_VEHICLE_WAITING
 } SystemState;
 
 static int running = 1;
@@ -39,6 +40,14 @@ static void on_capacity(const char *status) {
 }
 
 static int close_vehicle_check(void) {
+  static int cb_buzzer_phase = 0;
+  cb_buzzer_phase = (cb_buzzer_phase + 1) % 10;
+  if (cb_buzzer_phase < 5) {
+    buzzer_on();
+  } else {
+    buzzer_off();
+  }
+
   double d = ultrasonic_measure_cm();
   if (d > 0 && d <= VEHICLE_DETECT_CM) return 1;
   if (switch_close_flag) {
@@ -61,7 +70,8 @@ static void on_switch_press(void) {
   }
 
   // 출차 처리 중 버튼: 닫힘 시 재열기
-  if (s == STATE_EXIT_REQUESTED || s == STATE_EXIT_VEHICLE_DETECTED) {
+  if (s == STATE_EXIT_REQUESTED || s == STATE_EXIT_VEHICLE_DETECTED ||
+      s == STATE_EXIT_VEHICLE_WAITING) {
     printf("출차 처리 중 — 버튼 감지, 닫힘 중 재열기 대기\n");
     switch_close_flag = 1;
     return;
@@ -153,7 +163,7 @@ int main(void) {
         state_timer = now;
         pthread_mutex_unlock(&state_mutex);
 
-        printf("[%.1f cm] 차량 사라짐 — 5초 타이머 시작\n", dist);
+        printf("[%.1f cm] 차량 사라짐 — 10초 타이머 시작\n", dist);
       }
       break;
 
@@ -167,7 +177,7 @@ int main(void) {
 
         printf("[%.1f cm] 차량 재감지 — 입차 상태 복귀\n", dist);
       } else if (now - state_timer >= ENTRY_CLOSE_DELAY_SEC) {
-        // 5초 경과 — 게이트 닫음
+        // 10초 경과 — 게이트 닫음
         switch_close_flag = 0;
         if (gate_close_interruptible(close_vehicle_check) < 0) {
           pthread_mutex_lock(&state_mutex);
@@ -181,7 +191,7 @@ int main(void) {
           sys_state = STATE_IDLE;
           pthread_mutex_unlock(&state_mutex);
           mqtt_publish_gate_state("CLOSED");  // [검토] 입차 timer 만료 후 게이트 CLOSED 상태 발행
-          printf("5초 경과 — 게이트 닫음\n");
+          printf("10초 경과 — 게이트 닫음\n");
         }
       }
       break;
@@ -216,7 +226,25 @@ int main(void) {
 
     case STATE_EXIT_VEHICLE_DETECTED:
       if (dist < 0 || dist > VEHICLE_DETECT_CM) {
-        // 차량 빠져나감 — 출차 완료
+        // 차량 빠져나감 — 출차 대기로 전환
+        pthread_mutex_lock(&state_mutex);
+        sys_state = STATE_EXIT_VEHICLE_WAITING;
+        state_timer = now;
+        pthread_mutex_unlock(&state_mutex);
+        printf("[%.1f cm] 차량 빠져나감 — 10초 대기 시작\n", dist);
+      }
+      break;
+
+    case STATE_EXIT_VEHICLE_WAITING:
+      if (dist > 0 && dist <= VEHICLE_DETECT_CM) {
+        // 차량 재감지 — 출차 감지 상태로 복귀
+        pthread_mutex_lock(&state_mutex);
+        sys_state = STATE_EXIT_VEHICLE_DETECTED;
+        state_timer = now;
+        pthread_mutex_unlock(&state_mutex);
+        printf("[%.1f cm] 차량 재감지 — 출차 감지 상태 복귀\n", dist);
+      } else if (now - state_timer >= ENTRY_CLOSE_DELAY_SEC) {
+        // 10초 경과 — 출차 완료, 게이트 닫음
         switch_close_flag = 0;
         if (gate_close_interruptible(close_vehicle_check) < 0) {
           pthread_mutex_lock(&state_mutex);
@@ -224,13 +252,13 @@ int main(void) {
           state_timer = now;
           pthread_mutex_unlock(&state_mutex);
           mqtt_publish_gate_state("OPEN");
-          printf("닫힘 중 차량 재감지 — 게이트 재열기\n");
+          printf("닫힘 중 차량 재감지 — 게이트 재열기, 출차 감지 상태 복귀\n");
         } else {
           pthread_mutex_lock(&state_mutex);
           sys_state = STATE_IDLE;
           pthread_mutex_unlock(&state_mutex);
           mqtt_publish_gate_state("CLOSED");  // [검토] 출차 완료 후 게이트 CLOSED 상태 발행
-          printf("[%.1f cm] 차량 빠져나감 — 출차 완료, 게이트 닫음\n", dist);
+          printf("10초 경과 — 출차 완료, 게이트 닫음\n");
         }
       }
       break;
