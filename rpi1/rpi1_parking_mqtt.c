@@ -38,9 +38,9 @@ int main(int argc, char *argv[])
     // init mqtt
     mosquitto_lib_init();
     mosq = mosquitto_new("parking_rpi1", true, NULL);
-    if (!mosq) { 
-		fprintf(stderr, "mosquitto_new failed\n"); 
-		return 1; 
+    if (!mosq) {
+        fprintf(stderr, "mosquitto_new failed\n");
+        return 1;
     }
 
     ret = mosquitto_connect(mosq, broker, port, 60);
@@ -52,8 +52,25 @@ int main(int argc, char *argv[])
     }
     printf("parking_mqtt_daemon: connected to %s:%d\n", broker, port);
 
+    // 백그라운드 MQTT 루프 스레드 시작 (자동 Keep Alive 및 재연결 처리)
+    ret = mosquitto_loop_start(mosq);
+    if (ret != MOSQ_ERR_SUCCESS) {
+        fprintf(stderr, "mosquitto_loop_start failed: %s\n", mosquitto_strerror(ret));
+        mosquitto_disconnect(mosq);
+        mosquitto_destroy(mosq);
+        mosquitto_lib_cleanup();
+        return 1;
+    }
+
     fd = open(DEV_PATH, O_RDONLY);
-    if (fd < 0) { perror("open " DEV_PATH); return 1; }
+    if (fd < 0) {
+        perror("open " DEV_PATH);
+        mosquitto_loop_stop(mosq, true);
+        mosquitto_disconnect(mosq);
+        mosquitto_destroy(mosq);
+        mosquitto_lib_cleanup();
+        return 1;
+    }
     printf("parking_mqtt_daemon: watching %s\n", DEV_PATH);
 
     while (running) {
@@ -66,7 +83,7 @@ int main(int argc, char *argv[])
             fprintf(stderr, "bad format: %s\n", buf);
             continue;
         }
-        printf("parsed: Slot1=%d Slot2=%dnDistance1=%dcm Distance2=%dcm\n", s1, s2, d1, d2);
+        printf("parsed: Slot1=%d Slot2=%d\nDistance1=%dcm Distance2=%dcm\n", s1, s2, d1, d2);
 
         // --- parking/rpi1/slot ---
         snprintf(payload, sizeof(payload),
@@ -88,17 +105,15 @@ int main(int argc, char *argv[])
                  "%s", (s1 && s2) ? "FULL" : "AVAILABLE");
         mosquitto_publish(mosq, NULL, TOPIC_LOT,
                           strlen(payload), payload, MQTT_QOS, MQTT_RETAIN);
-
-        mosquitto_loop(mosq, 0, 1);
     }
 
     printf("parking_mqtt_daemon: exiting\n");
     close(fd);
+    
+    // 백그라운드 루프 스레드 중지 및 연결 정리
+    mosquitto_loop_stop(mosq, true);
     mosquitto_disconnect(mosq);
     mosquitto_destroy(mosq);
     mosquitto_lib_cleanup();
     return 0;
 }
-
-
-
