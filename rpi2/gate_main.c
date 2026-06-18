@@ -83,6 +83,8 @@ void on_switch_press(void) {
     gate_open();
     exit_request_time = ktime_get_seconds();
     gate_set_state(STATE_EXIT_REQUESTED);
+  } else {
+    switch_set_reopen();
   }
 }
 
@@ -121,7 +123,7 @@ static int state_machine_thread_fn(void *data) {
       if (distance_cm > 0 && distance_cm <= VEHICLE_DETECT_CM) {
         pr_debug("[ENTRY] 거리: %d cm\n", distance_cm);
         last_vehicle_detect = now;
-      } else if (distance_cm > VEHICLE_DETECT_CM) {
+      } else if (distance_cm < 0 || distance_cm > VEHICLE_DETECT_CM) {
         pr_info("[%d cm] 차량 사라짐 — 10초 타이머 시작\n", distance_cm);
         last_vehicle_detect = now;
         gate_set_state(STATE_ENTRY_WAITING);
@@ -134,6 +136,7 @@ static int state_machine_thread_fn(void *data) {
         pr_info("10초 경과 — 게이트 닫음\n");
         if (gate_close_interruptible() < 0) {
           pr_info("[닫힘 중 감지] 게이트 재열기 — 입차 상태 복귀\n");
+          now = ktime_get_seconds();
           last_vehicle_detect = now;
           gate_set_state(STATE_ENTRY_DETECTED);
         } else {
@@ -157,6 +160,7 @@ static int state_machine_thread_fn(void *data) {
           pr_info("10초 경과 (차량 미감지) — 게이트 닫음 (타임아웃)\n");
           if (gate_close_interruptible() < 0) {
             pr_info("[닫힘 중 감지] 게이트 재열기 — 출차 요청 상태 복귀\n");
+            now = ktime_get_seconds();
             last_vehicle_detect = now;
             exit_request_time = now;
             gate_set_state(STATE_EXIT_REQUESTED);
@@ -184,6 +188,7 @@ static int state_machine_thread_fn(void *data) {
         pr_info("10초 경과 — 출차 완료, 게이트 닫음\n");
         if (gate_close_interruptible() < 0) {
           pr_info("[닫힘 중 감지] 게이트 재열기 — 출차 감지 상태 복귀\n");
+          now = ktime_get_seconds();
           last_vehicle_detect = now;
           gate_set_state(STATE_EXIT_VEHICLE_DETECTED);
         } else {
@@ -213,7 +218,7 @@ static int state_machine_thread_fn(void *data) {
         exit_led_set(0);
       }
     } else {
-      buzzer_phase = 0;
+      buzzer_phase = 9;
       buzzer_off();
       entry_led_set(0);
       exit_led_set(0);

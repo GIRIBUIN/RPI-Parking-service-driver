@@ -46,5 +46,7 @@ void set_capacity_full(int full);
 // 스위치 핸들링 (state_machine_thread 에서 폴링)
 int switch_was_pressed(void);
 void on_switch_press(void);
+void switch_set_reopen(void);
+int switch_reopen_was_requested(void);
 
 #endif

@@ -40,9 +40,8 @@ static void on_capacity(const char *status) {
 }
 
 static int close_vehicle_check(void) {
-  static int cb_buzzer_phase = 0;
-  cb_buzzer_phase = (cb_buzzer_phase + 1) % 10;
-  if (cb_buzzer_phase < 5) {
+  buzzer_phase = (buzzer_phase + 1) % 10;
+  if (buzzer_phase < 5) {
     buzzer_on();
   } else {
     buzzer_off();
@@ -180,9 +179,10 @@ int main(void) {
         // 10초 경과 — 게이트 닫음
         switch_close_flag = 0;
         if (gate_close_interruptible(close_vehicle_check) < 0) {
+          time_t fresh_now = time(NULL);
           pthread_mutex_lock(&state_mutex);
           sys_state = STATE_ENTRY_DETECTED;
-          state_timer = now;
+          state_timer = fresh_now;
           pthread_mutex_unlock(&state_mutex);
           mqtt_publish_gate_state("OPEN");
           printf("닫힘 중 차량 재감지 — 게이트 재열기\n");
@@ -208,9 +208,10 @@ int main(void) {
         // 10초 경과 — 타임아웃, 게이트 닫음
         switch_close_flag = 0;
         if (gate_close_interruptible(close_vehicle_check) < 0) {
+          time_t fresh_now = time(NULL);
           pthread_mutex_lock(&state_mutex);
           sys_state = STATE_EXIT_REQUESTED;
-          state_timer = now;
+          state_timer = fresh_now;
           pthread_mutex_unlock(&state_mutex);
           mqtt_publish_gate_state("OPEN");
           printf("닫힘 중 감지 — 게이트 재열기, 출차 요청 상태 복귀\n");
@@ -247,9 +248,10 @@ int main(void) {
         // 10초 경과 — 출차 완료, 게이트 닫음
         switch_close_flag = 0;
         if (gate_close_interruptible(close_vehicle_check) < 0) {
+          time_t fresh_now = time(NULL);
           pthread_mutex_lock(&state_mutex);
           sys_state = STATE_EXIT_VEHICLE_DETECTED;
-          state_timer = now;
+          state_timer = fresh_now;
           pthread_mutex_unlock(&state_mutex);
           mqtt_publish_gate_state("OPEN");
           printf("닫힘 중 차량 재감지 — 게이트 재열기, 출차 감지 상태 복귀\n");
@@ -279,7 +281,7 @@ int main(void) {
         entry_led_off();
       }
     } else {
-      buzzer_phase = 0;
+      buzzer_phase = 9;
       buzzer_off();
       entry_led_off();
     }

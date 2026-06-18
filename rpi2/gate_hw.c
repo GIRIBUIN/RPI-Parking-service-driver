@@ -32,6 +32,7 @@ static spinlock_t hw_lock;
 static int switch_irq = -1;
 static unsigned long last_switch_time = 0;
 static atomic_t switch_pressed = ATOMIC_INIT(0);  // Critical-1: atomic 플래그
+static atomic_t switch_reopen = ATOMIC_INIT(0);   // 닫힘 중 재열기 신호
 
 // 스테퍼 현재 단계 (0~7 범위)
 static int stepper_step = 0;
@@ -94,7 +95,7 @@ void gate_close(void) {
 int gate_close_interruptible(void) {
   unsigned long flags;
   int i, j, dist, steps_done = 0;
-  int local_buzzer_phase = 0;
+  int local_buzzer_phase = 9;
   const int BATCH = 64;
 
   for (i = 0; i < STEPPER_GATE_STEPS; i++) {
@@ -115,7 +116,8 @@ int gate_close_interruptible(void) {
       }
 
       dist = ultrasonic_measure_cm();
-      if ((dist > 0 && dist <= VEHICLE_DETECT_CM) || switch_was_pressed()) {
+      if ((dist > 0 && dist <= VEHICLE_DETECT_CM) || switch_was_pressed() ||
+          switch_reopen_was_requested()) {
         pr_info("[닫힘 중단] %d cm 감지 or 스위치 눌림 — %d 스텝 역방향 복귀\n", dist, steps_done);
         buzzer_off();
         for (j = 0; j < steps_done; j++) {
@@ -254,6 +256,14 @@ static irqreturn_t switch_irq_handler(int irq, void *dev_id) {
 // Critical-1: kthread에서 호출할 스위치 상태 확인 함수
 int switch_was_pressed(void) {
   return atomic_xchg(&switch_pressed, 0);
+}
+
+void switch_set_reopen(void) {
+  atomic_set(&switch_reopen, 1);
+}
+
+int switch_reopen_was_requested(void) {
+  return atomic_xchg(&switch_reopen, 0);
 }
 
 int gate_hw_init(void) {
