@@ -19,6 +19,28 @@ static volatile int running = 1;
 
 static void sig_handler(int sig) { (void)sig; running = 0; }
 
+static void on_connect(struct mosquitto *mosq,
+                       void *obj,
+                       int rc)
+{
+    if(rc == 0)
+        printf("[MQTT_RPI1] Connected successfully\n");
+    else
+        printf("[MQTT_RPI1] Connect failed rc=%d\n", rc);
+}
+
+static void on_disconnect(struct mosquitto *mosq,
+                          void *obj,
+                          int rc)
+{
+    printf("[MQTT_RPI1] Disconnected rc=%d\n", rc);
+    
+    if(rc != 0) {
+        printf("[MQTT_RPI1] Unexpected disconnect!\n");
+        mosquitto_reconnect_delay_set(m, 2, 30, true);
+    }
+}
+
 int main(int argc, char *argv[])
 {
     const char *broker = (argc >= 2) ? argv[1] : "192.168.4.1";
@@ -38,22 +60,43 @@ int main(int argc, char *argv[])
     // init mqtt
     mosquitto_lib_init();
     mosq = mosquitto_new("parking_rpi1", true, NULL);
-    if (!mosq) { 
-		fprintf(stderr, "mosquitto_new failed\n"); 
-		return 1; 
+    if (!mosq) {
+        fprintf(stderr, "[MQTT_RPI1] mosquitto_new failed\n");
+        return 1;
     }
+    
+    // 콜백 설정
+    mosquitto_connect_callback_set(mosq, on_connect);
+    mosquitto_disconnect_callback_set(mosq, on_disconnect);
 
     ret = mosquitto_connect(mosq, broker, port, 60);
     if (ret != MOSQ_ERR_SUCCESS) {
-        fprintf(stderr, "connect failed: %s\n", mosquitto_strerror(ret));
+        fprintf(stderr, "[MQTT_RPI1] connect failed: %s\n", mosquitto_strerror(ret));
         mosquitto_destroy(mosq);
         mosquitto_lib_cleanup();
         return 1;
     }
     printf("parking_mqtt_daemon: connected to %s:%d\n", broker, port);
 
+    // 백그라운드 MQTT 루프 스레드 시작 (자동 Keep Alive 및 재연결 처리)
+    ret = mosquitto_loop_start(mosq);
+    if (ret != MOSQ_ERR_SUCCESS) {
+        fprintf(stderr, "[MQTT_RPI1] mosquitto_loop_start failed: %s\n", mosquitto_strerror(ret));
+        mosquitto_disconnect(mosq);
+        mosquitto_destroy(mosq);
+        mosquitto_lib_cleanup();
+        return 1;
+    }
+
     fd = open(DEV_PATH, O_RDONLY);
-    if (fd < 0) { perror("open " DEV_PATH); return 1; }
+    if (fd < 0) {
+        perror("open " DEV_PATH);
+        mosquitto_loop_stop(mosq, true);
+        mosquitto_disconnect(mosq);
+        mosquitto_destroy(mosq);
+        mosquitto_lib_cleanup();
+        return 1;
+    }
     printf("parking_mqtt_daemon: watching %s\n", DEV_PATH);
 
     while (running) {
@@ -66,7 +109,7 @@ int main(int argc, char *argv[])
             fprintf(stderr, "bad format: %s\n", buf);
             continue;
         }
-        printf("parsed: Slot1=%d Slot2=%dnDistance1=%dcm Distance2=%dcm\n", s1, s2, d1, d2);
+        printf("parsed: Slot1=%d Slot2=%d\nDistance1=%dcm Distance2=%dcm\n", s1, s2, d1, d2);
 
         // --- parking/rpi1/slot ---
         snprintf(payload, sizeof(payload),
@@ -88,17 +131,15 @@ int main(int argc, char *argv[])
                  "%s", (s1 && s2) ? "FULL" : "AVAILABLE");
         mosquitto_publish(mosq, NULL, TOPIC_LOT,
                           strlen(payload), payload, MQTT_QOS, MQTT_RETAIN);
-
-        mosquitto_loop(mosq, 0, 1);
     }
 
     printf("parking_mqtt_daemon: exiting\n");
     close(fd);
+    
+    // 백그라운드 루프 스레드 중지 및 연결 정리
+    mosquitto_loop_stop(mosq, true);
     mosquitto_disconnect(mosq);
     mosquitto_destroy(mosq);
     mosquitto_lib_cleanup();
     return 0;
 }
-
-
-
